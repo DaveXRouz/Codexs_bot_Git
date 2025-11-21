@@ -888,6 +888,133 @@ COMMANDS_TEXT = {
     ),
 }
 
+ADMIN_ACCESS_DENIED = {
+    Language.EN: "⚠️ Admin access denied. This command is only available to administrators.",
+    Language.FA: "⚠️ دسترسی ادمین رد شد. این دستور فقط برای مدیران در دسترس است.",
+}
+
+ADMIN_MENU = {
+    Language.EN: (
+        "<b>🔧 Admin Panel</b>\n\n"
+        "Available commands:\n"
+        "/admin – Show this menu\n"
+        "/status – Bot status and health\n"
+        "/stats – Application and user statistics\n"
+        "/debug &lt;user_id&gt; – Debug user session\n"
+        "/sessions – List active sessions\n\n"
+        "All commands require admin privileges."
+    ),
+    Language.FA: (
+        "<b>🔧 پنل مدیریت</b>\n\n"
+        "دستورات موجود:\n"
+        "/admin – نمایش این منو\n"
+        "/status – وضعیت و سلامت ربات\n"
+        "/stats – آمار درخواست‌ها و کاربران\n"
+        "/debug &lt;user_id&gt; – اشکال‌زدایی جلسه کاربر\n"
+        "/sessions – لیست جلسات فعال\n\n"
+        "همه دستورات نیاز به دسترسی ادمین دارند."
+    ),
+}
+
+ADMIN_STATUS = {
+    Language.EN: (
+        "<b>🤖 Bot Status</b>\n\n"
+        "✅ Bot is running\n"
+        "📊 Applications: {app_count}\n"
+        "💬 Contact messages: {contact_count}\n"
+        "💾 Active sessions: {session_count}\n"
+        "🎤 Voice samples: {voice_count}\n\n"
+        "Last updated: {timestamp}"
+    ),
+    Language.FA: (
+        "<b>🤖 وضعیت ربات</b>\n\n"
+        "✅ ربات در حال اجرا است\n"
+        "📊 درخواست‌ها: {app_count}\n"
+        "💬 پیام‌های تماس: {contact_count}\n"
+        "💾 جلسات فعال: {session_count}\n"
+        "🎤 نمونه‌های صوتی: {voice_count}\n\n"
+        "آخرین به‌روزرسانی: {timestamp}"
+    ),
+}
+
+ADMIN_STATS = {
+    Language.EN: (
+        "<b>📊 Statistics</b>\n\n"
+        "📝 Total applications: {total_apps}\n"
+        "✅ Completed: {completed_apps}\n"
+        "⏳ Incomplete: {incomplete_apps}\n"
+        "💬 Contact messages: {contact_count}\n"
+        "👥 Unique users: {unique_users}\n"
+        "🌍 Languages:\n"
+        "  • English: {en_count}\n"
+        "  • Farsi: {fa_count}"
+    ),
+    Language.FA: (
+        "<b>📊 آمار</b>\n\n"
+        "📝 کل درخواست‌ها: {total_apps}\n"
+        "✅ تکمیل شده: {completed_apps}\n"
+        "⏳ ناتمام: {incomplete_apps}\n"
+        "💬 پیام‌های تماس: {contact_count}\n"
+        "👥 کاربران منحصر به فرد: {unique_users}\n"
+        "🌍 زبان‌ها:\n"
+        "  • انگلیسی: {en_count}\n"
+        "  • فارسی: {fa_count}"
+    ),
+}
+
+ADMIN_DEBUG_USER = {
+    Language.EN: (
+        "<b>🐛 User Debug Info</b>\n\n"
+        "User ID: {user_id}\n"
+        "Username: @{username}\n"
+        "Name: {name}\n\n"
+        "<b>Session:</b>\n"
+        "Language: {language}\n"
+        "Flow: {flow}\n"
+        "Question: {question_index}/12\n"
+        "Answers: {answer_count}\n"
+        "Waiting voice: {waiting_voice}\n"
+        "Voice skipped: {voice_skipped}\n"
+        "Edit mode: {edit_mode}\n\n"
+        "<b>Applications:</b>\n"
+        "Total: {app_count}"
+    ),
+    Language.FA: (
+        "<b>🐛 اطلاعات اشکال‌زدایی کاربر</b>\n\n"
+        "شناسه کاربر: {user_id}\n"
+        "نام کاربری: @{username}\n"
+        "نام: {name}\n\n"
+        "<b>جلسه:</b>\n"
+        "زبان: {language}\n"
+        "جریان: {flow}\n"
+        "سؤال: {question_index}/12\n"
+        "پاسخ‌ها: {answer_count}\n"
+        "در انتظار صدا: {waiting_voice}\n"
+        "صدا رد شده: {voice_skipped}\n"
+        "حالت ویرایش: {edit_mode}\n\n"
+        "<b>درخواست‌ها:</b>\n"
+        "کل: {app_count}"
+    ),
+}
+
+ADMIN_SESSIONS_LIST = {
+    Language.EN: (
+        "<b>💾 Active Sessions</b>\n\n"
+        "Total: {count}\n\n"
+        "{sessions_list}"
+    ),
+    Language.FA: (
+        "<b>💾 جلسات فعال</b>\n\n"
+        "کل: {count}\n\n"
+        "{sessions_list}"
+    ),
+}
+
+ADMIN_NO_SESSIONS = {
+    Language.EN: "No active sessions found.",
+    Language.FA: "هیچ جلسه فعالی یافت نشد.",
+}
+
 EXIT_CONFIRM_PROMPT = {
     Language.EN: "You have an in-progress flow. Exit and discard it?",
     Language.FA: "یک فرم در حال تکمیل دارید. می‌خواهید خارج شوید و آن را حذف کنید؟",

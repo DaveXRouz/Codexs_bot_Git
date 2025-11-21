@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import json
 import logging
 import re
 import time
@@ -102,6 +103,13 @@ from .localization import (
     APPLICATION_HISTORY_ITEM,
     APPLICATION_HISTORY_VOICE_RECEIVED,
     APPLICATION_HISTORY_VOICE_SKIPPED,
+    ADMIN_ACCESS_DENIED,
+    ADMIN_MENU,
+    ADMIN_STATUS,
+    ADMIN_STATS,
+    ADMIN_DEBUG_USER,
+    ADMIN_SESSIONS_LIST,
+    ADMIN_NO_SESSIONS,
     back_keyboard,
     contact_keyboard,
     edit_keyboard,
@@ -517,6 +525,28 @@ async def _load_session(update: Update, context: ContextTypes.DEFAULT_TYPE) -> O
     if session_data:
         return UserSession.from_dict(session_data)
     return None
+
+
+def _is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check if user is an admin."""
+    if not update.effective_user:
+        return False
+    settings = _get_settings(context)
+    return update.effective_user.id in settings.admin_user_ids
+
+
+async def _require_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check admin access and send error if denied."""
+    if not _is_admin(update, context):
+        if update.message:
+            session = get_session(context.user_data)
+            language = session.language or Language.EN
+            await update.message.reply_text(
+                ADMIN_ACCESS_DENIED[language],
+                parse_mode="HTML",
+            )
+        return False
+    return True
 
 
 def _summarize_session_state(session: UserSession, language: Language) -> str:
@@ -1936,6 +1966,260 @@ async def handle_location_shared(update: Update, context: ContextTypes.DEFAULT_T
         )
 
 
+async def handle_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Admin panel menu."""
+    if not await _require_admin(update, context) or not update.message:
+        return
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    await update.message.reply_text(
+        ADMIN_MENU[language],
+        parse_mode="HTML",
+    )
+
+
+async def handle_admin_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show bot status."""
+    if not await _require_admin(update, context) or not update.message:
+        return
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    storage = _get_storage(context)
+    settings = _get_settings(context)
+    
+    # Count applications
+    app_count = 0
+    if settings.applications_file.exists():
+        with settings.applications_file.open("r", encoding="utf-8") as f:
+            app_count = sum(1 for line in f if line.strip())
+    
+    # Count contact messages
+    contact_count = 0
+    if settings.contact_file.exists():
+        with settings.contact_file.open("r", encoding="utf-8") as f:
+            contact_count = sum(1 for line in f if line.strip())
+    
+    # Count active sessions
+    session_count = 0
+    if settings.sessions_dir.exists():
+        session_count = len(list(settings.sessions_dir.glob("session_*.json")))
+    
+    # Count voice samples
+    voice_count = 0
+    if settings.voice_dir.exists():
+        voice_count = len(list(settings.voice_dir.glob("*")))
+    
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    
+    await update.message.reply_text(
+        ADMIN_STATUS[language].format(
+            app_count=app_count,
+            contact_count=contact_count,
+            session_count=session_count,
+            voice_count=voice_count,
+            timestamp=timestamp,
+        ),
+        parse_mode="HTML",
+    )
+
+
+async def handle_admin_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show detailed statistics."""
+    if not await _require_admin(update, context) or not update.message:
+        return
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    storage = _get_storage(context)
+    settings = _get_settings(context)
+    
+    # Read all applications
+    total_apps = 0
+    completed_apps = 0
+    incomplete_apps = 0
+    en_count = 0
+    fa_count = 0
+    unique_users = set()
+    
+    if settings.applications_file.exists():
+        with settings.applications_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    app = json.loads(line)
+                    total_apps += 1
+                    unique_users.add(app.get("applicant", {}).get("telegram_id"))
+                    
+                    # Check if completed (has application_id)
+                    if app.get("application_id"):
+                        completed_apps += 1
+                    else:
+                        incomplete_apps += 1
+                    
+                    # Count languages
+                    app_lang = app.get("language", "en")
+                    if app_lang == "en":
+                        en_count += 1
+                    elif app_lang == "fa":
+                        fa_count += 1
+                except json.JSONDecodeError:
+                    continue
+    
+    # Count contact messages
+    contact_count = 0
+    if settings.contact_file.exists():
+        with settings.contact_file.open("r", encoding="utf-8") as f:
+            contact_count = sum(1 for line in f if line.strip())
+    
+    await update.message.reply_text(
+        ADMIN_STATS[language].format(
+            total_apps=total_apps,
+            completed_apps=completed_apps,
+            incomplete_apps=incomplete_apps,
+            contact_count=contact_count,
+            unique_users=len(unique_users),
+            en_count=en_count,
+            fa_count=fa_count,
+        ),
+        parse_mode="HTML",
+    )
+
+
+async def handle_admin_debug(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Debug a specific user's session."""
+    if not await _require_admin(update, context) or not update.message:
+        return
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    
+    if not context.args or len(context.args) == 0:
+        await update.message.reply_text(
+            "Usage: /debug &lt;user_id&gt;" if language == Language.EN
+            else "استفاده: /debug &lt;user_id&gt;",
+            parse_mode="HTML",
+        )
+        return
+    
+    try:
+        user_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text(
+            "Invalid user ID. Use: /debug &lt;user_id&gt;" if language == Language.EN
+            else "شناسه کاربر نامعتبر. استفاده: /debug &lt;user_id&gt;",
+            parse_mode="HTML",
+        )
+        return
+    
+    storage = _get_storage(context)
+    
+    # Load user session
+    session_data = await storage.load_session(user_id)
+    user_session = None
+    if session_data:
+        user_session = UserSession.from_dict(session_data)
+    
+    # Get user applications
+    user_apps = await storage.get_user_applications(user_id)
+    
+    # Try to get user info from bot (if possible)
+    try:
+        bot = context.bot
+        user = await bot.get_chat(user_id)
+        username = user.username or "N/A"
+        name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "N/A"
+    except Exception:
+        username = "N/A"
+        name = "N/A"
+    
+    # Format session info
+    if user_session:
+        session_lang = user_session.language.value if user_session.language else "N/A"
+        session_flow = user_session.flow.name if user_session.flow else "N/A"
+        question_idx = user_session.question_index
+        answer_count = len([v for v in user_session.answers.values() if v])
+        waiting_voice = "Yes" if user_session.waiting_voice else "No"
+        voice_skipped = "Yes" if user_session.voice_skipped else "No"
+        edit_mode = "Yes" if user_session.edit_mode else "No"
+    else:
+        session_lang = "N/A"
+        session_flow = "N/A"
+        question_idx = 0
+        answer_count = 0
+        waiting_voice = "No"
+        voice_skipped = "No"
+        edit_mode = "No"
+    
+    await update.message.reply_text(
+        ADMIN_DEBUG_USER[language].format(
+            user_id=user_id,
+            username=username,
+            name=name,
+            language=session_lang,
+            flow=session_flow,
+            question_index=question_idx,
+            answer_count=answer_count,
+            waiting_voice=waiting_voice,
+            voice_skipped=voice_skipped,
+            edit_mode=edit_mode,
+            app_count=len(user_apps),
+        ),
+        parse_mode="HTML",
+    )
+
+
+async def handle_admin_sessions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """List all active sessions."""
+    if not await _require_admin(update, context) or not update.message:
+        return
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    settings = _get_settings(context)
+    storage = _get_storage(context)
+    
+    # Get all session files
+    session_files = list(settings.sessions_dir.glob("session_*.json"))
+    
+    if not session_files:
+        await update.message.reply_text(
+            ADMIN_NO_SESSIONS[language],
+            parse_mode="HTML",
+        )
+        return
+    
+    sessions_list = []
+    for session_file in session_files[:20]:  # Limit to 20 sessions
+        try:
+            user_id = int(session_file.stem.split("_")[1])
+            session_data = await storage.load_session(user_id)
+            if session_data:
+                user_session = UserSession.from_dict(session_data)
+                if user_session.has_incomplete_application():
+                    progress = len([v for v in user_session.answers.values() if v])
+                    lang = user_session.language.value if user_session.language else "N/A"
+                    sessions_list.append(f"• User {user_id}: {progress} answers, {lang}")
+        except Exception:
+            continue
+    
+    if not sessions_list:
+        await update.message.reply_text(
+            ADMIN_NO_SESSIONS[language],
+            parse_mode="HTML",
+        )
+        return
+    
+    sessions_text = "\n".join(sessions_list)
+    if len(session_files) > 20:
+        sessions_text += f"\n\n... and {len(session_files) - 20} more"
+    
+    await update.message.reply_text(
+        ADMIN_SESSIONS_LIST[language].format(
+            count=len(session_files),
+            sessions_list=sessions_text,
+        ),
+        parse_mode="HTML",
+    )
+
+
 def main() -> None:
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -1967,6 +2251,12 @@ def main() -> None:
     application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("help", handle_help))
     application.add_handler(CommandHandler("commands", handle_commands))
+    # Admin commands
+    application.add_handler(CommandHandler("admin", handle_admin))
+    application.add_handler(CommandHandler("status", handle_admin_status))
+    application.add_handler(CommandHandler("stats", handle_admin_stats))
+    application.add_handler(CommandHandler("debug", handle_admin_debug))
+    application.add_handler(CommandHandler("sessions", handle_admin_sessions))
     application.add_handler(MessageHandler(filters.CONTACT, handle_contact_shared))
     application.add_handler(MessageHandler(filters.LOCATION, handle_location_shared))
     application.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))

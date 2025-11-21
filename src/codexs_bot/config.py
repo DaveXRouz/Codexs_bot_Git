@@ -4,7 +4,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
 from dotenv import load_dotenv
 
@@ -27,6 +27,7 @@ class Settings:
     media_dir: Path
     openai_api_key: Optional[str]
     openai_model: str
+    admin_user_ids: List[int]
 
 
 def load_settings() -> Settings:
@@ -81,6 +82,18 @@ def load_settings() -> Settings:
     group_chat_id_value = int(group_chat_id) if group_chat_id else None
     openai_api_key = os.getenv("OPENAI_API_KEY")
     openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    
+    # Load admin user IDs (comma-separated)
+    admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
+    admin_user_ids: List[int] = []
+    if admin_ids_str:
+        for admin_id_str in admin_ids_str.split(","):
+            admin_id_str = admin_id_str.strip()
+            if admin_id_str:
+                try:
+                    admin_user_ids.append(int(admin_id_str))
+                except ValueError:
+                    logger.warning(f"Invalid admin user ID: {admin_id_str}")
 
     return Settings(
         bot_token=token,
@@ -97,5 +110,6 @@ def load_settings() -> Settings:
         media_dir=media_dir,
         openai_api_key=openai_api_key,
         openai_model=openai_model,
+        admin_user_ids=admin_user_ids,
     )
 
