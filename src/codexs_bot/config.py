@@ -24,6 +24,8 @@ class Settings:
     enable_media: bool
     group_chat_id: Optional[int]
     media_dir: Path
+    openai_api_key: Optional[str]
+    openai_model: str
 
 
 def load_settings() -> Settings:
@@ -73,6 +75,8 @@ def load_settings() -> Settings:
     enable_media = os.getenv("ENABLE_MEDIA", "false").lower() in {"1", "true", "yes", "on"}
     group_chat_id = os.getenv("GROUP_CHAT_ID")
     group_chat_id_value = int(group_chat_id) if group_chat_id else None
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+    openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
     return Settings(
         bot_token=token,
@@ -86,5 +90,7 @@ def load_settings() -> Settings:
         enable_media=enable_media,
         group_chat_id=group_chat_id_value,
         media_dir=media_dir,
+        openai_api_key=openai_api_key,
+        openai_model=openai_model,
     )
 

@@ -20,6 +20,7 @@ from telegram.ext import (
     filters,
 )
 
+from .ai import OpenAIFallback
 from .config import load_settings
 from .localization import (
     ABOUT_CTA,
@@ -399,6 +400,50 @@ def _get_contact_notifier(context: ContextTypes.DEFAULT_TYPE) -> WebhookNotifier
     return context.application.bot_data["contact_notifier"]
 
 
+def _get_ai_responder(context: ContextTypes.DEFAULT_TYPE) -> Optional[OpenAIFallback]:
+    return context.application.bot_data.get("ai_responder")  # type: ignore[return-value]
+
+
+def _summarize_session_state(session: UserSession) -> str:
+    if session.flow == Flow.APPLY:
+        return f"User is filling the hiring application (question {session.question_index + 1})."
+    if session.flow == Flow.CONFIRM:
+        return "User is reviewing the summary before submission."
+    if session.flow == Flow.CONTACT_MESSAGE and session.contact_pending:
+        return "User is deciding whether to leave a contact/support message."
+    if session.flow == Flow.CONTACT_MESSAGE:
+        return "User is composing a contact/support message."
+    if session.waiting_voice:
+        return "User must submit the mandatory English voice sample."
+    return "User is at the main menu."
+
+
+async def _maybe_ai_reply(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+    user_text: str,
+) -> bool:
+    responder = _get_ai_responder(context)
+    if not responder or not responder.enabled:
+        return False
+    if not update.message:
+        return False
+
+    language = session.language or Language.EN
+    context_text = _summarize_session_state(session)
+    ai_reply = await responder.generate_reply(language, context_text, user_text)
+    if not ai_reply:
+        return False
+
+    await update.message.reply_text(
+        ai_reply,
+        parse_mode="HTML",
+        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+    )
+    return True
+
+
 async def _open_menu_section(
     key: str,
     update: Update,
@@ -694,11 +739,12 @@ async def handle_main_menu_choice(
         await _open_menu_section(inferred_key, update, context, session, language)
         return
 
-    await update.message.reply_text(
-        FALLBACK_MESSAGE[language],
-        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
-        parse_mode="HTML",
-    )
+    if not await _maybe_ai_reply(update, context, session, text):
+        await update.message.reply_text(
+            FALLBACK_MESSAGE[language],
+            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            parse_mode="HTML",
+        )
 
 
 async def share_about_story(update: Update, context: ContextTypes.DEFAULT_TYPE, session: UserSession, language: Language) -> None:
@@ -1477,6 +1523,10 @@ def main() -> None:
         "contact",
     )
     application.bot_data["group_chat_id"] = settings.group_chat_id
+    application.bot_data["ai_responder"] = OpenAIFallback(
+        settings.openai_api_key,
+        settings.openai_model,
+    )
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("menu", menu_command))

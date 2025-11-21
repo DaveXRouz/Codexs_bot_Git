@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+import re
 from typing import Dict, List, Optional
 
 
@@ -903,12 +904,37 @@ def is_back_button(text: str, language: Language) -> bool:
     return text.strip() == BACK_TO_MENU[language]
 
 
+_YES_KEYWORDS = {
+    Language.EN: {"yes", "y", "yeah", "yep", "sure", "ok", "okay", "affirmative", "confirm"},
+    Language.FA: {"بله", "بلی", "اره", "آره", "اوکی", "باشه", "حتماً"},
+}
+
+_NO_KEYWORDS = {
+    Language.EN: {"no", "n", "nope", "nah", "cancel", "stop"},
+    Language.FA: {"خیر", "نه", "نخیر", "بیخیال", "لغو"},
+}
+
+
+def _normalize_answer(text: str) -> str:
+    lowered = text.strip().lower()
+    cleaned = re.sub(r"[^\w\u0600-\u06FF]+", "", lowered)
+    return cleaned
+
+
 def is_yes(text: str, language: Language) -> bool:
-    return text.strip() == YES_LABEL[language]
+    stripped = text.strip()
+    if stripped == YES_LABEL[language]:
+        return True
+    normalized = _normalize_answer(stripped)
+    return normalized in _YES_KEYWORDS[language]
 
 
 def is_no(text: str, language: Language) -> bool:
-    return text.strip() == NO_LABEL[language]
+    stripped = text.strip()
+    if stripped == NO_LABEL[language]:
+        return True
+    normalized = _normalize_answer(stripped)
+    return normalized in _NO_KEYWORDS[language]
 
 
 def is_skip(text: str, language: Language) -> bool:

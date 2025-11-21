@@ -75,7 +75,11 @@ APPLICATION_WEBHOOK_TOKEN=your_bearer_token
 CONTACT_WEBHOOK_URL=https://your-api.com/contact
 GROUP_CHAT_ID=-1001234567890
 ENABLE_MEDIA=true
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
 ```
+
+`OPENAI_API_KEY` is optional—add it to enable the conversational fallback powered by OpenAI (defaults to disabled). Leave `OPENAI_MODEL` empty to use the default `gpt-4o-mini` or point it to any compatible chat-completions model.
 
 ## 📁 Project Structure
 
