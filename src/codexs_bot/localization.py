@@ -185,8 +185,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="full_name",
         prompts={
-            Language.EN: "<b>1️⃣ What's your full legal name?</b>\n<i>First and last name as it appears on official documents</i>",
-            Language.FA: "<b>۱️⃣ نام و نام خانوادگی کامل شما چیست؟</b>\n<i>نام و نام خانوادگی طبق مدارک رسمی</i>",
+            Language.EN: "<b>What's your full legal name?</b>\n<i>First and last name as it appears on official documents</i>",
+            Language.FA: "<b>نام و نام خانوادگی کامل شما چیست؟</b>\n<i>نام و نام خانوادگی طبق مدارک رسمی</i>",
         },
         summary_labels={
             Language.EN: "Full name",
@@ -196,8 +196,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="email",
         prompts={
-            Language.EN: "<b>2️⃣ What's your primary email address?</b>\n<i>We'll use this for all official Codexs communication</i>",
-            Language.FA: "<b>۲️⃣ آدرس ایمیل اصلی شما چیست؟</b>\n<i>برای تمام ارتباطات رسمی Codexs استفاده می‌شود</i>",
+            Language.EN: "<b>What's your primary email address?</b>\n<i>We'll use this for all official Codexs communication</i>",
+            Language.FA: "<b>آدرس ایمیل اصلی شما چیست؟</b>\n<i>برای تمام ارتباطات رسمی Codexs استفاده می‌شود</i>",
         },
         summary_labels={
             Language.EN: "Email",
@@ -207,8 +207,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="contact",
         prompts={
-            Language.EN: "<b>3️⃣ How can we reach you?</b>\n<i>Tap 📱 Share Contact or type your phone number with country code</i>",
-            Language.FA: "<b>۳️⃣ چگونه می‌توانیم با شما تماس بگیریم؟</b>\n<i>روی 📱 اشتراک مخاطب بزنید یا شماره تلفن همراه با کد کشور را بنویسید</i>",
+            Language.EN: "<b>How can we reach you?</b>\n<i>Tap 📱 Share Contact or type your phone number with country code</i>",
+            Language.FA: "<b>چگونه می‌توانیم با شما تماس بگیریم؟</b>\n<i>روی 📱 اشتراک مخاطب بزنید یا شماره تلفن همراه با کد کشور را بنویسید</i>",
         },
         summary_labels={
             Language.EN: "Contact method",
@@ -219,8 +219,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="location",
         prompts={
-            Language.EN: "<b>4️⃣ Where are you based?</b>\n<i>Tap 📍 Share Location or type: City, Country (Timezone)</i>",
-            Language.FA: "<b>۴️⃣ کجا زندگی می‌کنید؟</b>\n<i>روی 📍 اشتراک موقعیت بزنید یا بنویسید: شهر، کشور (منطقه زمانی)</i>",
+            Language.EN: "<b>Where are you based?</b>\n<i>Tap 📍 Share Location or type: City, Country (Timezone)</i>",
+            Language.FA: "<b>کجا زندگی می‌کنید؟</b>\n<i>روی 📍 اشتراک موقعیت بزنید یا بنویسید: شهر، کشور (منطقه زمانی)</i>",
         },
         summary_labels={
             Language.EN: "Location & time zone",
@@ -231,8 +231,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="role_category",
         prompts={
-            Language.EN: "<b>5️⃣ What's your primary role?</b>\n<i>Select the category that best matches your expertise</i>",
-            Language.FA: "<b>۵️⃣ نقش اصلی شما چیست؟</b>\n<i>دسته‌ای را انتخاب کنید که بیشتر با تخصص شما مطابقت دارد</i>",
+            Language.EN: "<b>What's your primary role?</b>\n<i>Select the category that best matches your expertise</i>",
+            Language.FA: "<b>نقش اصلی شما چیست؟</b>\n<i>دسته‌ای را انتخاب کنید که بیشتر با تخصص شما مطابقت دارد</i>",
         },
         summary_labels={
             Language.EN: "Role category",
@@ -243,8 +243,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="skills",
         prompts={
-            Language.EN: "<b>6️⃣ What are your core skills?</b>\n<i>List technologies, frameworks, or methodologies (comma-separated)</i>\n\nExample: Python, React, AWS, Figma",
-            Language.FA: "<b>۶️⃣ مهارت‌های اصلی شما کدام‌اند؟</b>\n<i>تکنولوژی‌ها، فریم‌ورک‌ها یا متدولوژی‌ها را لیست کنید (با ویرگول جدا شوند)</i>\n\nمثال: Python, React, AWS, Figma",
+            Language.EN: "<b>What are your core skills?</b>\n<i>List technologies, frameworks, or methodologies (comma-separated)</i>\n\nExample: Python, React, AWS, Figma",
+            Language.FA: "<b>مهارت‌های اصلی شما کدام‌اند؟</b>\n<i>تکنولوژی‌ها، فریم‌ورک‌ها یا متدولوژی‌ها را لیست کنید (با ویرگول جدا شوند)</i>\n\nمثال: Python, React, AWS, Figma",
         },
         summary_labels={
             Language.EN: "Skills / tech stack",
@@ -254,8 +254,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="experience",
         prompts={
-            Language.EN: "<b>7️⃣ How many years of relevant experience do you have?</b>\n<i>Select the range that matches your professional background</i>",
-            Language.FA: "<b>۷️⃣ چند سال سابقه کاری مرتبط دارید؟</b>\n<i>بازه‌ای را انتخاب کنید که با پیشینه حرفه‌ای شما مطابقت دارد</i>",
+            Language.EN: "<b>How many years of relevant experience do you have?</b>\n<i>Select the range that matches your professional background</i>",
+            Language.FA: "<b>چند سال سابقه کاری مرتبط دارید؟</b>\n<i>بازه‌ای را انتخاب کنید که با پیشینه حرفه‌ای شما مطابقت دارد</i>",
         },
         summary_labels={
             Language.EN: "Experience",
@@ -266,8 +266,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="portfolio",
         prompts={
-            Language.EN: "<b>8️⃣ Show us your work</b>\n<i>Share a portfolio link, GitHub, Behance, or brief description of past projects</i>",
-            Language.FA: "<b>۸️⃣ کارهای خود را به ما نشان دهید</b>\n<i>لینک پورتفولیو، GitHub، Behance یا توضیح مختصری از پروژه‌های گذشته بدهید</i>",
+            Language.EN: "<b>Show us your work</b>\n<i>Share a portfolio link, GitHub, Behance, or brief description of past projects</i>",
+            Language.FA: "<b>کارهای خود را به ما نشان دهید</b>\n<i>لینک پورتفولیو، GitHub، Behance یا توضیح مختصری از پروژه‌های گذشته بدهید</i>",
         },
         summary_labels={
             Language.EN: "Portfolio / work samples",
@@ -277,8 +277,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="start_date",
         prompts={
-            Language.EN: "<b>9️⃣ When can you start?</b>\n<i>Choose your earliest availability or specify a custom date</i>",
-            Language.FA: "<b>۹️⃣ چه زمانی می‌توانید شروع کنید؟</b>\n<i>زودترین زمان آمادگی خود را انتخاب کنید یا تاریخ دلخواه را مشخص کنید</i>",
+            Language.EN: "<b>When can you start?</b>\n<i>Choose your earliest availability or specify a custom date</i>",
+            Language.FA: "<b>چه زمانی می‌توانید شروع کنید؟</b>\n<i>زودترین زمان آمادگی خود را انتخاب کنید یا تاریخ دلخواه را مشخص کنید</i>",
         },
         summary_labels={
             Language.EN: "Earliest start date",
@@ -289,8 +289,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="working_hours",
         prompts={
-            Language.EN: "<b>🔟 What's your preferred work shift?</b>\n<i>Choose the schedule that matches your productivity rhythm</i>",
-            Language.FA: "<b>🔟 شیفت کاری ترجیحی شما چیست؟</b>\n<i>برنامه‌ای را انتخاب کنید که با ریتم بهره‌وری شما هماهنگ است</i>",
+            Language.EN: "<b>What's your preferred work shift?</b>\n<i>Choose the schedule that matches your productivity rhythm</i>",
+            Language.FA: "<b>شیفت کاری ترجیحی شما چیست؟</b>\n<i>برنامه‌ای را انتخاب کنید که با ریتم بهره‌وری شما هماهنگ است</i>",
         },
         summary_labels={
             Language.EN: "Preferred shift",
@@ -301,8 +301,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="motivation",
         prompts={
-            Language.EN: "<b>1️⃣1️⃣ Why Codexs?</b>\n<i>What excites you about joining our team? What makes this a strong fit?</i>",
-            Language.FA: "<b>۱۱️⃣ چرا Codexs؟</b>\n<i>چه چیزی در مورد پیوستن به تیم ما شما را هیجان‌زده می‌کند؟ چرا این همکاری مناسب است؟</i>",
+            Language.EN: "<b>Why Codexs?</b>\n<i>What excites you about joining our team? What makes this a strong fit?</i>",
+            Language.FA: "<b>چرا Codexs؟</b>\n<i>چه چیزی در مورد پیوستن به تیم ما شما را هیجان‌زده می‌کند؟ چرا این همکاری مناسب است؟</i>",
         },
         summary_labels={
             Language.EN: "Motivation",
@@ -312,8 +312,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="salary",
         prompts={
-            Language.EN: "<b>1️⃣2️⃣ Salary expectations (Optional)</b>\n<i>Share your expected range in USD/month, or type 'Skip' if you prefer to discuss later</i>",
-            Language.FA: "<b>۱۲️⃣ انتظار حقوق (اختیاری)</b>\n<i>بازه مورد انتظار خود را به دلار در ماه بنویسید، یا «رد کردن» بنویسید اگر ترجیح می‌دهید بعداً صحبت کنیم</i>",
+            Language.EN: "<b>Salary expectations (Optional)</b>\n<i>Share your expected range in USD/month, or type 'Skip' if you prefer to discuss later</i>",
+            Language.FA: "<b>انتظار حقوق (اختیاری)</b>\n<i>بازه مورد انتظار خود را به دلار در ماه بنویسید، یا «رد کردن» بنویسید اگر ترجیح می‌دهید بعداً صحبت کنیم</i>",
         },
         summary_labels={
             Language.EN: "Salary expectations",
