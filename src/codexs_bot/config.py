@@ -39,6 +39,14 @@ def load_settings() -> Settings:
                 "BOT_TOKEN contained leading/trailing or non-printable characters. "
                 "Sanitizing value before use."
             )
+
+        if sanitized_token.lower().startswith("bot="):
+            logger.warning("BOT_TOKEN started with 'bot='. Removing prefix.")
+            sanitized_token = sanitized_token[4:]
+        elif sanitized_token.startswith("="):
+            logger.warning("BOT_TOKEN started with '='. Removing leading '='.")
+            sanitized_token = sanitized_token.lstrip("=")
+
         token = sanitized_token
 
     if not token:
