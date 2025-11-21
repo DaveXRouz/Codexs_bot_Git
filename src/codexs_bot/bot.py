@@ -532,17 +532,26 @@ def _is_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     if not update.effective_user:
         return False
     settings = _get_settings(context)
-    return update.effective_user.id in settings.admin_user_ids
+    user_id = update.effective_user.id
+    is_admin = user_id in settings.admin_user_ids
+    logger.info(f"Admin check for user {user_id}: {is_admin} (Admin IDs: {settings.admin_user_ids})")
+    return is_admin
 
 
 async def _require_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     """Check admin access and send error if denied."""
+    if not update.effective_user:
+        return False
     if not _is_admin(update, context):
         if update.message:
             session = get_session(context.user_data)
             language = session.language or Language.EN
+            user_id = update.effective_user.id
+            error_msg = ADMIN_ACCESS_DENIED[language]
+            # Add user ID for debugging
+            error_msg += f"\n\nYour User ID: <code>{user_id}</code>"
             await update.message.reply_text(
-                ADMIN_ACCESS_DENIED[language],
+                error_msg,
                 parse_mode="HTML",
             )
         return False
@@ -1968,8 +1977,27 @@ async def handle_location_shared(update: Update, context: ContextTypes.DEFAULT_T
 
 async def handle_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin panel menu."""
-    if not await _require_admin(update, context) or not update.message:
+    if not update.message or not update.effective_user:
         return
+    
+    user_id = update.effective_user.id
+    logger.info(f"Admin command received from user {user_id}")
+    
+    # Always show debug info first to help troubleshoot
+    settings = _get_settings(context)
+    is_admin = user_id in settings.admin_user_ids
+    
+    if not is_admin:
+        debug_msg = (
+            f"🔍 <b>Debug Info</b>\n\n"
+            f"Your User ID: <code>{user_id}</code>\n"
+            f"Configured Admin IDs: <code>{settings.admin_user_ids}</code>\n"
+            f"Admin Check: ❌ Failed\n\n"
+            f"{ADMIN_ACCESS_DENIED[Language.EN]}"
+        )
+        await update.message.reply_text(debug_msg, parse_mode="HTML")
+        return
+    
     session = get_session(context.user_data)
     language = session.language or Language.EN
     await update.message.reply_text(
