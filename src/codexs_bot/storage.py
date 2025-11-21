@@ -4,7 +4,7 @@ import asyncio
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from .localization import Language
 
@@ -106,4 +106,33 @@ class DataStorage:
         session_file = self._session_file(user_id)
         if session_file.exists():
             await asyncio.to_thread(session_file.unlink)
+
+    async def get_user_applications(self, user_id: int) -> List[Dict[str, Any]]:
+        """Get all applications submitted by a user."""
+        if not self._applications_file.exists():
+            return []
+        try:
+            return await asyncio.to_thread(self._read_user_applications, self._applications_file, user_id)
+        except Exception:
+            return []
+
+    @staticmethod
+    def _read_user_applications(applications_file: Path, user_id: int) -> List[Dict[str, Any]]:
+        """Read and filter applications by user ID."""
+        applications = []
+        with applications_file.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    app = json.loads(line)
+                    applicant = app.get("applicant", {})
+                    if applicant.get("telegram_id") == user_id:
+                        applications.append(app)
+                except json.JSONDecodeError:
+                    continue
+        # Sort by submission date (newest first)
+        applications.sort(key=lambda x: x.get("submitted_at", ""), reverse=True)
+        return applications
 

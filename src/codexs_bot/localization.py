@@ -59,6 +59,45 @@ RESUME_NO = {
     Language.FA: "🔄 خیر، شروع جدید",
 }
 
+APPLICATION_HISTORY_HEADER = {
+    Language.EN: "<b>📋 Your Applications</b>",
+    Language.FA: "<b>📋 درخواست‌های شما</b>",
+}
+
+APPLICATION_HISTORY_EMPTY = {
+    Language.EN: "You haven't submitted any applications yet.\n\nUse 💼 Apply for jobs to get started!",
+    Language.FA: "شما هنوز درخواستی ارسال نکرده‌اید.\n\nاز 💼 ارسال درخواست همکاری استفاده کنید تا شروع کنید!",
+}
+
+APPLICATION_HISTORY_ITEM = {
+    Language.EN: (
+        "<b>Application {number}</b>\n"
+        "🆔 ID: {app_id}\n"
+        "📅 Submitted: {date}\n"
+        "👤 Name: {name}\n"
+        "📧 Email: {email}\n"
+        "🎤 Voice: {voice_status}"
+    ),
+    Language.FA: (
+        "<b>درخواست {number}</b>\n"
+        "🆔 شناسه: {app_id}\n"
+        "📅 ارسال شده: {date}\n"
+        "👤 نام: {name}\n"
+        "📧 ایمیل: {email}\n"
+        "🎤 صدا: {voice_status}"
+    ),
+}
+
+APPLICATION_HISTORY_VOICE_RECEIVED = {
+    Language.EN: "✅ Received",
+    Language.FA: "✅ دریافت شد",
+}
+
+APPLICATION_HISTORY_VOICE_SKIPPED = {
+    Language.EN: "⚠️ Skipped",
+    Language.FA: "⚠️ رد شده",
+}
+
 LANDING_CARD_CAPTION = (
     "<b>Codexs · Global automation studio</b>\n"
     "Apply for remote roles, explore AI launches, and reach our team across time zones.\n\n"
@@ -132,6 +171,10 @@ MENU_LABELS: Dict[str, Dict[Language, str]] = {
         Language.EN: "📞 Contact & support",
         Language.FA: "📞 تماس و پشتیبانی",
     },
+    "history": {
+        Language.EN: "📋 My applications",
+        Language.FA: "📋 درخواست‌های من",
+    },
     "switch": {
         Language.EN: "🔁 Switch to فارسی",
         Language.FA: "🔁 تغییر به English",
@@ -154,6 +197,10 @@ MENU_TOPIC_TITLES = {
     "contact": {
         Language.EN: "contact and support",
         Language.FA: "تماس و پشتیبانی",
+    },
+    "history": {
+        Language.EN: "application history",
+        Language.FA: "تاریخچه درخواست‌ها",
     },
 }
 
@@ -943,6 +990,9 @@ def main_menu_labels(language: Language) -> List[List[str]]:
         [
             MENU_LABELS["updates"][language],
             MENU_LABELS["contact"][language],
+        ],
+        [
+            MENU_LABELS["history"][language],
         ],
         [
             MENU_LABELS["switch"][language],

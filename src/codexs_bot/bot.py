@@ -97,6 +97,11 @@ from .localization import (
     RESUME_PROMPT,
     RESUME_YES,
     RESUME_NO,
+    APPLICATION_HISTORY_HEADER,
+    APPLICATION_HISTORY_EMPTY,
+    APPLICATION_HISTORY_ITEM,
+    APPLICATION_HISTORY_VOICE_RECEIVED,
+    APPLICATION_HISTORY_VOICE_SKIPPED,
     back_keyboard,
     contact_keyboard,
     edit_keyboard,
@@ -669,6 +674,10 @@ async def _open_menu_section(
         )
         return
 
+    if key == "history":
+        await show_application_history(update, context, session, language)
+        return
+
 
 async def handle_exit_confirmation(update: Update, session: UserSession, text: str) -> None:
     if not update.message:
@@ -956,7 +965,7 @@ async def handle_main_menu_choice(
     session.flow = Flow.IDLE
     session.last_menu_choice = None
     matched_key = _match_menu_button(text, language)
-    if matched_key in {"apply", "about", "updates", "contact"}:
+    if matched_key in {"apply", "about", "updates", "contact", "history"}:
         await _open_menu_section(matched_key, update, context, session, language)
         return
     if matched_key == "switch":
@@ -1054,6 +1063,83 @@ async def share_updates(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         f"{UPDATES_CTA[language]} {UPDATES_LINK}",
         reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
     )
+
+
+async def show_application_history(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+    language: Language,
+) -> None:
+    """Display user's application history."""
+    if not update.message or not update.effective_user:
+        return
+    
+    storage = _get_storage(context)
+    applications = await storage.get_user_applications(update.effective_user.id)
+    
+    if not applications:
+        await update.message.reply_text(
+            APPLICATION_HISTORY_EMPTY[language],
+            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            parse_mode="HTML",
+        )
+        return
+    
+    # Send header
+    await update.message.reply_text(
+        APPLICATION_HISTORY_HEADER[language],
+        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        parse_mode="HTML",
+    )
+    
+    # Send each application (limit to last 10 to avoid message length issues)
+    for idx, app in enumerate(applications[:10], 1):
+        app_id = app.get("application_id", "N/A")
+        submitted_at = app.get("submitted_at", "")
+        
+        # Parse and format date
+        try:
+            dt = datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
+            date_str = dt.strftime("%Y-%m-%d %H:%M")
+        except Exception:
+            date_str = submitted_at
+        
+        answers = app.get("answers", {})
+        name = answers.get("full_name", "—")
+        email = answers.get("email", "—")
+        
+        # Determine voice status
+        voice_file_id = app.get("voice_file_id")
+        voice_skipped = app.get("voice_skipped", False)
+        if voice_file_id:
+            voice_status = APPLICATION_HISTORY_VOICE_RECEIVED[language]
+        elif voice_skipped or (not voice_file_id and app.get("voice_file_path") is None):
+            # If no voice_file_id and no voice_file_path, likely skipped
+            voice_status = APPLICATION_HISTORY_VOICE_SKIPPED[language]
+        else:
+            voice_status = "—"
+        
+        history_text = APPLICATION_HISTORY_ITEM[language].format(
+            number=idx,
+            app_id=app_id,
+            date=date_str,
+            name=_sanitize_html(str(name)),
+            email=_sanitize_html(str(email)),
+            voice_status=voice_status,
+        )
+        
+        await update.message.reply_text(
+            history_text,
+            parse_mode="HTML",
+        )
+    
+    if len(applications) > 10:
+        await update.message.reply_text(
+            f"<i>Showing 10 most recent applications. Total: {len(applications)}</i>" if language == Language.EN
+            else f"<i>نمایش ۱۰ درخواست اخیر. مجموع: {len(applications)}</i>",
+            parse_mode="HTML",
+        )
 
 
 async def ask_current_question(update: Update, session: UserSession) -> None:
