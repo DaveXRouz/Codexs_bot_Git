@@ -1,0 +1,911 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from enum import Enum
+from typing import Dict, List, Optional
+
+
+class Language(Enum):
+    EN = "en"
+    FA = "fa"
+
+
+LANGUAGE_BUTTONS: Dict[Language, str] = {
+    Language.EN: "🇬🇧 English",
+    Language.FA: "🇮🇷 فارسی",
+}
+
+BILINGUAL_WELCOME = (
+    "Select your language to continue · زبان خود را برای ادامه انتخاب کنید"
+)
+
+LANGUAGE_PROMPT = {
+    Language.EN: "Tap a language below to continue.",
+    Language.FA: "لطفاً یکی از زبان‌ها را از دکمه‌های زیر انتخاب کنید.",
+}
+
+WELCOME_MESSAGE = {
+    Language.EN: (
+        "Welcome to <b>Codexs.ai</b> — global automation studio.\n"
+        "Tell me what you'd like to do and I'll guide you."
+    ),
+    Language.FA: (
+        "به <b>Codexs.ai</b> خوش آمدید — استودیوی جهانی اتوماسیون.\n"
+        "بفرمایید به دنبال چه هستید تا راهنمایی‌تان کنم."
+    ),
+}
+
+BACK_TO_MENU = {
+    Language.EN: "⬅️ Back to main menu",
+    Language.FA: "⬅️ بازگشت به منوی اصلی",
+}
+
+YES_LABEL = {
+    Language.EN: "✅ Yes",
+    Language.FA: "✅ بله",
+}
+NO_LABEL = {
+    Language.EN: "♻️ No, edit",
+    Language.FA: "♻️ خیر، ویرایش",
+}
+
+SKIP_LABEL = {
+    Language.EN: "Skip",
+    Language.FA: "رد کردن",
+}
+
+SKIPPED_TEXT = {
+    Language.EN: "(skipped)",
+    Language.FA: "(رد شده)",
+}
+
+SHARE_CONTACT_BUTTON = {
+    Language.EN: "📱 Share my Telegram contact",
+    Language.FA: "📱 اشتراک‌گذاری مخاطب تلگرام",
+}
+
+SHARE_LOCATION_BUTTON = {
+    Language.EN: "📍 Share my location",
+    Language.FA: "📍 اشتراک‌گذاری موقعیت مکانی",
+}
+
+CONTACT_SHARED_ACK = {
+    Language.EN: "✅ Contact received! Moving to the next question.",
+    Language.FA: "✅ مخاطب دریافت شد! به سؤال بعدی می‌رویم.",
+}
+
+LOCATION_SHARED_ACK = {
+    Language.EN: "✅ Location received! Moving to the next question.",
+    Language.FA: "✅ موقعیت دریافت شد! به سؤال بعدی می‌رویم.",
+}
+
+CONTACT_SHARED_NOTIFICATION = {
+    Language.EN: "📞 New contact message",
+    Language.FA: "📞 پیام جدید",
+}
+
+MENU_LABELS: Dict[str, Dict[Language, str]] = {
+    "apply": {
+        Language.EN: "💼 Apply for jobs",
+        Language.FA: "💼 ارسال درخواست همکاری",
+    },
+    "about": {
+        Language.EN: "🏢 About Codex",
+        Language.FA: "🏢 درباره Codex",
+    },
+    "updates": {
+        Language.EN: "📢 Updates & news",
+        Language.FA: "📢 به‌روزرسانی‌ها و خبرها",
+    },
+    "contact": {
+        Language.EN: "📞 Contact & support",
+        Language.FA: "📞 تماس و پشتیبانی",
+    },
+    "switch": {
+        Language.EN: "🔁 Switch to فارسی",
+        Language.FA: "🔁 تغییر به English",
+    },
+}
+
+ROLE_CHOICES = {
+    Language.EN: [
+        ["Engineering", "Design"],
+        ["Product", "Support"],
+        ["Marketing", "Other"],
+    ],
+    Language.FA: [
+        ["مهندسی", "طراحی"],
+        ["محصول", "پشتیبانی"],
+        ["مارکتینگ", "سایر"],
+    ],
+}
+
+EXPERIENCE_CHOICES = {
+    Language.EN: [["0-1 yrs", "2-4 yrs"], ["5-7 yrs", "8+ yrs"]],
+    Language.FA: [["۰-۱ سال", "۲-۴ سال"], ["۵-۷ سال", "۸+ سال"]],
+}
+
+SHIFT_CHOICES = {
+    Language.EN: [["🌅 Morning shift", "🌙 Night shift"], ["🔄 Flexible / Both"]],
+    Language.FA: [["🌅 شیفت صبح", "🌙 شیفت شب"], ["🔄 انعطاف‌پذیر / هر دو"]],
+}
+
+START_DATE_CHOICES = {
+    Language.EN: [
+        ["Immediately", "Within 2 weeks"],
+        ["Within 1 month", "Within 2-3 months"],
+        ["Custom date (type below)"]
+    ],
+    Language.FA: [
+        ["فوری", "ظرف ۲ هفته"],
+        ["ظرف ۱ ماه", "ظرف ۲-۳ ماه"],
+        ["تاریخ دلخواه (پایین بنویسید)"]
+    ],
+}
+
+
+@dataclass(frozen=True)
+class Question:
+    key: str
+    prompts: Dict[Language, str]
+    summary_labels: Dict[Language, str]
+    keyboard: Optional[Dict[Language, List[List[str]]]] = None
+    optional: bool = False
+    input_type: str = "text"  # "text", "contact", "location"
+
+
+HIRING_QUESTIONS: List[Question] = [
+    Question(
+        key="full_name",
+        prompts={
+            Language.EN: "<b>1️⃣ What's your full legal name?</b>\n<i>First and last name as it appears on official documents</i>",
+            Language.FA: "<b>۱️⃣ نام و نام خانوادگی کامل شما چیست؟</b>\n<i>نام و نام خانوادگی طبق مدارک رسمی</i>",
+        },
+        summary_labels={
+            Language.EN: "Full name",
+            Language.FA: "نام و نام خانوادگی",
+        },
+    ),
+    Question(
+        key="email",
+        prompts={
+            Language.EN: "<b>2️⃣ What's your primary email address?</b>\n<i>We'll use this for all official Codexs communication</i>",
+            Language.FA: "<b>۲️⃣ آدرس ایمیل اصلی شما چیست؟</b>\n<i>برای تمام ارتباطات رسمی Codexs استفاده می‌شود</i>",
+        },
+        summary_labels={
+            Language.EN: "Email",
+            Language.FA: "ایمیل",
+        },
+    ),
+    Question(
+        key="contact",
+        prompts={
+            Language.EN: "<b>3️⃣ How can we reach you?</b>\n<i>Tap 📱 Share Contact or type your phone number with country code</i>",
+            Language.FA: "<b>۳️⃣ چگونه می‌توانیم با شما تماس بگیریم؟</b>\n<i>روی 📱 اشتراک مخاطب بزنید یا شماره تلفن همراه با کد کشور را بنویسید</i>",
+        },
+        summary_labels={
+            Language.EN: "Contact method",
+            Language.FA: "راه ارتباطی",
+        },
+        input_type="contact",
+    ),
+    Question(
+        key="location",
+        prompts={
+            Language.EN: "<b>4️⃣ Where are you based?</b>\n<i>Tap 📍 Share Location or type: City, Country (Timezone)</i>",
+            Language.FA: "<b>۴️⃣ کجا زندگی می‌کنید؟</b>\n<i>روی 📍 اشتراک موقعیت بزنید یا بنویسید: شهر، کشور (منطقه زمانی)</i>",
+        },
+        summary_labels={
+            Language.EN: "Location & time zone",
+            Language.FA: "مکان و منطقه زمانی",
+        },
+        input_type="location",
+    ),
+    Question(
+        key="role_category",
+        prompts={
+            Language.EN: "<b>5️⃣ What's your primary role?</b>\n<i>Select the category that best matches your expertise</i>",
+            Language.FA: "<b>۵️⃣ نقش اصلی شما چیست؟</b>\n<i>دسته‌ای را انتخاب کنید که بیشتر با تخصص شما مطابقت دارد</i>",
+        },
+        summary_labels={
+            Language.EN: "Role category",
+            Language.FA: "دسته‌بندی نقش",
+        },
+        keyboard=ROLE_CHOICES,
+    ),
+    Question(
+        key="skills",
+        prompts={
+            Language.EN: "<b>6️⃣ What are your core skills?</b>\n<i>List technologies, frameworks, or methodologies (comma-separated)</i>\n\nExample: Python, React, AWS, Figma",
+            Language.FA: "<b>۶️⃣ مهارت‌های اصلی شما کدام‌اند؟</b>\n<i>تکنولوژی‌ها، فریم‌ورک‌ها یا متدولوژی‌ها را لیست کنید (با ویرگول جدا شوند)</i>\n\nمثال: Python, React, AWS, Figma",
+        },
+        summary_labels={
+            Language.EN: "Skills / tech stack",
+            Language.FA: "مهارت‌ها / تکنولوژی‌ها",
+        },
+    ),
+    Question(
+        key="experience",
+        prompts={
+            Language.EN: "<b>7️⃣ How many years of relevant experience do you have?</b>\n<i>Select the range that matches your professional background</i>",
+            Language.FA: "<b>۷️⃣ چند سال سابقه کاری مرتبط دارید؟</b>\n<i>بازه‌ای را انتخاب کنید که با پیشینه حرفه‌ای شما مطابقت دارد</i>",
+        },
+        summary_labels={
+            Language.EN: "Experience",
+            Language.FA: "سابقه",
+        },
+        keyboard=EXPERIENCE_CHOICES,
+    ),
+    Question(
+        key="portfolio",
+        prompts={
+            Language.EN: "<b>8️⃣ Show us your work</b>\n<i>Share a portfolio link, GitHub, Behance, or brief description of past projects</i>",
+            Language.FA: "<b>۸️⃣ کارهای خود را به ما نشان دهید</b>\n<i>لینک پورتفولیو، GitHub، Behance یا توضیح مختصری از پروژه‌های گذشته بدهید</i>",
+        },
+        summary_labels={
+            Language.EN: "Portfolio / work samples",
+            Language.FA: "نمونه‌کارها",
+        },
+    ),
+    Question(
+        key="start_date",
+        prompts={
+            Language.EN: "<b>9️⃣ When can you start?</b>\n<i>Choose your earliest availability or specify a custom date</i>",
+            Language.FA: "<b>۹️⃣ چه زمانی می‌توانید شروع کنید؟</b>\n<i>زودترین زمان آمادگی خود را انتخاب کنید یا تاریخ دلخواه را مشخص کنید</i>",
+        },
+        summary_labels={
+            Language.EN: "Earliest start date",
+            Language.FA: "زودترین زمان شروع",
+        },
+        keyboard=START_DATE_CHOICES,
+    ),
+    Question(
+        key="working_hours",
+        prompts={
+            Language.EN: "<b>🔟 What's your preferred work shift?</b>\n<i>Choose the schedule that matches your productivity rhythm</i>",
+            Language.FA: "<b>🔟 شیفت کاری ترجیحی شما چیست؟</b>\n<i>برنامه‌ای را انتخاب کنید که با ریتم بهره‌وری شما هماهنگ است</i>",
+        },
+        summary_labels={
+            Language.EN: "Preferred shift",
+            Language.FA: "شیفت ترجیحی",
+        },
+        keyboard=SHIFT_CHOICES,
+    ),
+    Question(
+        key="motivation",
+        prompts={
+            Language.EN: "<b>1️⃣1️⃣ Why Codexs.ai?</b>\n<i>What excites you about joining our team? What makes this a good fit?</i>",
+            Language.FA: "<b>۱۱️⃣ چرا Codexs.ai؟</b>\n<i>چه چیزی در مورد پیوستن به تیم ما شما را هیجان‌زده می‌کند؟ چرا این همکاری مناسب است؟</i>",
+        },
+        summary_labels={
+            Language.EN: "Motivation",
+            Language.FA: "انگیزه",
+        },
+    ),
+    Question(
+        key="salary",
+        prompts={
+            Language.EN: "<b>1️⃣2️⃣ Salary expectations (Optional)</b>\n<i>Share your expected range in USD/month, or type 'Skip' if you prefer to discuss later</i>",
+            Language.FA: "<b>۱۲️⃣ انتظار حقوق (اختیاری)</b>\n<i>بازه مورد انتظار خود را به دلار در ماه بنویسید، یا «رد کردن» بنویسید اگر ترجیح می‌دهید بعداً صحبت کنیم</i>",
+        },
+        summary_labels={
+            Language.EN: "Salary expectations",
+            Language.FA: "انتظار حقوق",
+        },
+        optional=True,
+    ),
+]
+
+HIRING_INTRO = {
+    Language.EN: (
+        "<b>💼 Codexs.ai Application</b>\n\n"
+        "This form has <b>12 short questions</b> (~3 minutes)\n"
+        "Plus a mandatory <b>English voice test</b>\n\n"
+        "🔒 Your answers stay confidential with the Codexs hiring team\n"
+        "✅ You can edit before final submission"
+    ),
+    Language.FA: (
+        "<b>💼 فرم درخواست Codexs.ai</b>\n\n"
+        "این فرم <b>۱۲ سؤال کوتاه</b> دارد (حدود ۳ دقیقه)\n"
+        "به اضافه <b>تست صوتی انگلیسی اجباری</b>\n\n"
+        "🔒 پاسخ‌ها نزد تیم استخدام Codexs محرمانه می‌ماند\n"
+        "✅ قبل از ارسال نهایی می‌توانید ویرایش کنید"
+    ),
+}
+
+QUESTION_PROGRESS = {
+    Language.EN: "Question {current}/{total}",
+    Language.FA: "سؤال {current}/{total}",
+}
+
+VOICE_SAMPLE_TEXT = (
+    "At Codexs dot A I, we build intelligent automation systems for global teams. "
+    "Every project requires clear communication, async collaboration, and proactive problem-solving. "
+    "Remote work demands precision in written updates and spoken English. "
+    "Our engineers, designers, and operators coordinate across multiple time zones daily."
+)
+
+VOICE_PROMPT = {
+    Language.EN: (
+        "<b>📣 English Voice Test (Required)</b>\n\n"
+        "Please read this text out loud and send a voice message:\n\n"
+        f"<i>\"{VOICE_SAMPLE_TEXT}\"</i>\n\n"
+        "⏱ Duration: 30-45 seconds\n"
+        "🎯 We evaluate: clarity, fluency, pronunciation"
+    ),
+    Language.FA: (
+        "<b>📣 تست صوتی انگلیسی (اجباری)</b>\n\n"
+        "لطفاً این متن را با صدای بلند بخوانید و یک پیام صوتی ارسال کنید:\n\n"
+        f"<i>\"{VOICE_SAMPLE_TEXT}\"</i>\n\n"
+        "⏱ مدت زمان: ۳۰-۴۵ ثانیه\n"
+        "🎯 ما ارزیابی می‌کنیم: وضوح، روانی، تلفظ"
+    ),
+}
+
+VOICE_ACK = {
+    Language.EN: "Voice sample received and stored for the hiring team. ✅",
+    Language.FA: "نمونه صدای شما دریافت و برای تیم استخدام ذخیره شد. ✅",
+}
+
+THANK_YOU = {
+    Language.EN: (
+        "All set! Your application has been submitted.\n\n"
+        "📋 <b>Application ID:</b> {app_id}\n\n"
+        "The Codexs.ai hiring team will review your profile and reach out via email or Telegram within <b>1-2 business days</b>.\n\n"
+        "You can now return to the main menu to explore other sections."
+    ),
+    Language.FA: (
+        "همه چیز ثبت شد! درخواست شما ارسال شد.\n\n"
+        "📋 <b>شناسه درخواست:</b> {app_id}\n\n"
+        "تیم استخدام Codexs.ai پروفایل شما را بررسی می‌کند و ظرف <b>۱ تا ۲ روز کاری</b> از طریق ایمیل یا تلگرام تماس می‌گیرد.\n\n"
+        "اکنون می‌توانید به منوی اصلی برگردید و سایر بخش‌ها را بررسی کنید."
+    ),
+}
+
+CONFIRMATION_IMAGE_CAPTION = {
+    Language.EN: "Thank you for applying to Codexs.ai. We'll be in touch soon.",
+    Language.FA: "از درخواست شما متشکریم. به زودی با شما تماس خواهیم گرفت.",
+}
+
+SUMMARY_HEADER = {
+    Language.EN: "Here is the summary of the data we captured:",
+    Language.FA: "خلاصه اطلاعات ثبت‌شده:",
+}
+
+CONFIRM_PROMPT = {
+    Language.EN: "Is everything correct?",
+    Language.FA: "آیا همه موارد درست است؟",
+}
+
+EDIT_PROMPT = {
+    Language.EN: (
+        "Please share the question number (1-12) you would like to edit.\n\n"
+        "💡 <b>Tip:</b> You can also re-record your voice sample by selecting 13."
+    ),
+    Language.FA: (
+        "لطفاً شماره سوال موردنظر برای ویرایش (۱ تا ۱۲) را بفرستید.\n\n"
+        "💡 <b>نکته:</b> می‌توانید نمونه صوتی خود را دوباره ضبط کنید با انتخاب ۱۳."
+    ),
+}
+
+INVALID_EDIT = {
+    Language.EN: "I couldn't match that number. Please send a value between 1 and 13 (13 = re-record voice).",
+    Language.FA: "شماره معتبر نیست. لطفاً عددی بین ۱ تا ۱۳ بفرستید (۱۳ = ضبط مجدد صدا).",
+}
+
+RERECORD_VOICE_PROMPT = {
+    Language.EN: (
+        "You've chosen to re-record your voice sample.\n\n"
+        "Please record and send a new English voice message."
+    ),
+    Language.FA: (
+        "شما انتخاب کرده‌اید که نمونه صوتی خود را دوباره ضبط کنید.\n\n"
+        "لطفاً یک پیام صوتی انگلیسی جدید ضبط و ارسال کنید."
+    ),
+}
+
+ABOUT_TEXT = {
+    Language.EN: (
+        "**Codexs.ai — Global Automation Studio**\n"
+        "We build precision systems at the intersection of AI, software, data, and operations. "
+        "Remote-first. Tesla-level craft. Always bilingual."
+    ),
+    Language.FA: (
+        "**Codexs.ai — استودیوی جهانی اتوماسیون**\n"
+        "در تقاطع هوش مصنوعی، نرم‌افزار، داده و عملیات تجربه‌های دقیق می‌سازیم. "
+        "کاملاً ریموت، با کیفیت سطح تسلا و همیشه دو‌زبانه."
+    ),
+}
+
+ABOUT_SECTIONS = {
+    Language.EN: [
+        {
+            "title": "Mission Control",
+            "body": (
+                "Codexs.ai builds distributed automation layers for ambitious product, data, and ops teams.\n"
+                "• Hybrid squads of AI engineers, product thinkers, and operators\n"
+                "• 4–6 week launch windows with live telemetry dashboards\n"
+                "• Preferred stack: PyTorch, LangChain, Temporal, Supabase, Svelte"
+            ),
+        },
+        {
+            "title": "Operating Principles",
+            "body": (
+                "• Tesla / SpaceX-level quality bar, minimalist comms\n"
+                "• Bilingual workflows (English / Farsi) baked into every artifact\n"
+                "• Humans + agents paired for reliability, traceability, and speed"
+            ),
+        },
+        {
+            "title": "Proof of Work",
+            "body": (
+                "• Designed a self-healing data ops mesh for a Middle East fintech\n"
+                "• Launched a multi-agent CX cockpit that triages 1M+ yearly tickets\n"
+                "• Embedded with deep-tech funds to validate AI-native venture bets"
+            ),
+        },
+    ],
+    Language.FA: [
+        {
+            "title": "اتاق فرمان",
+            "body": (
+                "Codexs.ai لایه‌های اتوماسیون توزیع‌شده برای تیم‌های محصول، داده و عملیات می‌سازد.\n"
+                "• اسکادران‌های ترکیبی شامل مهندسان هوش مصنوعی، طراحان محصول و اپراتورها\n"
+                "• پنجره‌های راه‌اندازی ۴ تا ۶ هفته‌ای همراه با داشبورد تله‌متری\n"
+                "• استک محبوب: PyTorch، LangChain، Temporal، Supabase، Svelte"
+            ),
+        },
+        {
+            "title": "اصول عملکردی",
+            "body": (
+                "• استاندارد کیفیت در سطح Tesla / SpaceX با ارتباطات مینیمال\n"
+                "• کار دو‌زبانه (انگلیسی / فارسی) در همه مستندات و تحویل‌ها\n"
+                "• همکاری انسان + ایجنت برای پایداری، ردیابی و سرعت"
+            ),
+        },
+        {
+            "title": "اثبات کار",
+            "body": (
+                "• ساخت مش داده‌ی خودترمیم برای یک فین‌تک خاورمیانه‌ای\n"
+                "• لانچ کوپیت چندایجنتی پشتیبانی که سالانه بالای ۱ میلیون تیکت را مدیریت می‌کند\n"
+                "• همکاری با صندوق‌های دیپ‌تک برای اعتبارسنجی سرمایه‌گذاری‌های AI-native"
+            ),
+        },
+    ],
+}
+
+ABOUT_MEDIA = {
+    Language.EN: {
+        "photo": None,  # No photo for About section
+        "caption": "",
+    },
+    Language.FA: {
+        "photo": None,  # No photo for About section
+        "caption": "",
+    },
+}
+
+ABOUT_CTA = {
+    Language.EN: "Would you like to view open roles?",
+    Language.FA: "مایلید فرصت‌های شغلی باز را ببینید؟",
+}
+
+VIEW_ROLES_YES = {
+    Language.EN: "✅ Yes, show me open roles",
+    Language.FA: "✅ بله، فرصت‌های شغلی را نشان بده",
+}
+
+VIEW_ROLES_NO = {
+    Language.EN: "⬅️ Back to main menu",
+    Language.FA: "⬅️ بازگشت به منوی اصلی",
+}
+
+UPDATES = {
+    Language.EN: [
+        "⚡ Released a new AI automation layer for a fintech scale-up.",
+        "🌍 Expanded remote squads across EMEA & APAC time zones.",
+        "🧠 Hiring senior engineers, designers, and product operators for 2025.",
+    ],
+    Language.FA: [
+        "⚡ لایه جدید اتوماسیون هوش مصنوعی برای یک فین‌تک توسعه یافت.",
+        "🌍 تیم‌های ریموت در مناطق زمانی EMEA و APAC گسترش یافتند.",
+        "🧠 جذب مهندسان، طراحان و مدیران محصول ارشد برای سال ۲۰۲۵ ادامه دارد.",
+    ],
+}
+
+UPDATES_LINK = "https://codexs.ai"
+
+UPDATES_CTA = {
+    Language.EN: "More launches:",
+    Language.FA: "اطلاعات بیشتر:",
+}
+
+UPDATE_CARDS = {
+    Language.EN: [
+        {
+            "title": "System X Automation Layer",
+            "body": (
+                "We shipped a Temporal + LLM mesh that closes the loop on KYC reviews in <4 minutes "
+                "for a regulated fintech. Human supervisors now audit via a single Codexs cockpit."
+            ),
+            "cta_label": "Read build notes",
+            "cta_url": "https://codexs.ai/case/system-x",
+            "photo": None,  # No photo for this card
+        },
+        {
+            "title": "Global Ops Pods",
+            "body": (
+                "New pods spun up in Dubai, Warsaw, and Kuala Lumpur give 24/6 coverage without "
+                "compromising Codexs craft. Every pod pairs PM, AI lead, designer, and automation ops."
+            ),
+            "cta_label": "Meet the pods",
+            "cta_url": "https://codexs.ai/ops",
+            "photo": "https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?auto=format&fit=crop&w=1600&q=80",
+        },
+        {
+            "title": "Culture Reel 2025",
+            "body": (
+                "A two-minute reel that shows how we run bilingual standups, async critiques, "
+                "and Tesla-level QA rituals from anywhere on the planet."
+            ),
+            "cta_label": "Watch the reel",
+            "cta_url": "https://codexs.ai/culture",
+            "photo": None,  # No photo for this card
+        },
+    ],
+    Language.FA: [
+        {
+            "title": "لایه اتوماسیون System X",
+            "body": (
+                "یک مش Temporal + LLM پیاده‌سازی کردیم که بررسی KYC را برای فین‌تکی تحت نظارت "
+                "در کمتر از ۴ دقیقه می‌بندد. ناظران انسانی همه چیز را در یک کوپیت Codexs مشاهده می‌کنند."
+            ),
+            "cta_label": "یادداشت‌های ساخت",
+            "cta_url": "https://codexs.ai/case/system-x",
+            "photo": None,  # No photo for this card
+        },
+        {
+            "title": "پادهای عملیات جهانی",
+            "body": (
+                "پادهای تازه در دبی، ورشو و کوالالامپور راه‌اندازی شد تا پوشش ۶ روزه ۲۴ ساعته "
+                "با همان کیفیت Codexs فراهم شود. هر پاد شامل PM، رهبر AI، طراح و اپراتور اتوماسیون است."
+            ),
+            "cta_label": "آشنایی با پادها",
+            "cta_url": "https://codexs.ai/ops",
+            "photo": "https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7?auto=format&fit=crop&w=1600&q=80",
+        },
+        {
+            "title": "ریل فرهنگ ۲۰۲۵",
+            "body": (
+                "فیلم دو دقیقه‌ای که نشان می‌دهد استنداپ‌های دو‌زبانه، کریتیک‌های غیرهمزمان "
+                "و روتین‌های QA در سطح تسلا را از هرجای دنیا چگونه اجرا می‌کنیم."
+            ),
+            "cta_label": "مشاهده ویدیو",
+            "cta_url": "https://codexs.ai/culture",
+            "photo": None,  # No photo for this card
+        },
+    ],
+}
+
+CONTACT_INFO = {
+    Language.EN: (
+        "You can email contact@codexs.ai or visit https://codexs.ai.\n"
+        "Would you like to send a short message here?"
+    ),
+    Language.FA: (
+        "می‌توانید به contact@codexs.ai ایمیل بزنید یا به https://codexs.ai سر بزنید.\n"
+        "مایلید همین‌جا پیام کوتاهی بگذارید؟"
+    ),
+}
+
+CONTACT_THANKS = {
+    Language.EN: (
+        "✅ Message saved for the Codexs ops team.\n\n"
+        "We'll review your message and respond within <b>1-2 business days</b> via email or Telegram."
+    ),
+    Language.FA: (
+        "✅ پیام شما برای تیم عملیات Codexs ثبت شد.\n\n"
+        "پیام شما را بررسی می‌کنیم و ظرف <b>۱ تا ۲ روز کاری</b> از طریق ایمیل یا تلگرام پاسخ می‌دهیم."
+    ),
+}
+
+CONTACT_SKIP = {
+    Language.EN: "No worries. Let me know if you need anything else.",
+    Language.FA: "اشکالی ندارد. اگر مورد دیگری بود حتماً بگویید.",
+}
+
+CONTACT_DECISION_REMINDER = {
+    Language.EN: "Please tap Yes or No so I know whether to collect a message.",
+    Language.FA: "لطفاً دکمه بله یا خیر را بزنید تا بدانم باید پیام بگیرم یا خیر.",
+}
+
+FALLBACK_MESSAGE = {
+    Language.EN: "I didn't catch that. Please use the menu buttons below, or type /menu to return to the main menu.",
+    Language.FA: "متوجه نشدم. لطفاً از دکمه‌های منو استفاده کنید یا دستور /menu را برای بازگشت به منوی اصلی بفرستید.",
+}
+
+HELP_TEXT_APPLY = {
+    Language.EN: (
+        "You're in the <b>application flow</b>.\n\n"
+        "• Answer each question one by one\n"
+        "• Use buttons when available\n"
+        "• Voice recording is mandatory\n"
+        "• You can edit answers before submitting\n\n"
+        "Type /menu to cancel and return to main menu."
+    ),
+    Language.FA: (
+        "شما در <b>فرم درخواست</b> هستید.\n\n"
+        "• به هر سؤال یکی یکی پاسخ دهید\n"
+        "• از دکمه‌ها استفاده کنید\n"
+        "• ضبط صدا اجباری است\n"
+        "• می‌توانید قبل از ارسال ویرایش کنید\n\n"
+        "دستور /menu را برای لغو و بازگشت به منوی اصلی بفرستید."
+    ),
+}
+
+HELP_TEXT_VOICE = {
+    Language.EN: (
+        "You need to <b>record a voice message</b>.\n\n"
+        "• Read the English text provided\n"
+        "• Record 30-45 seconds\n"
+        "• Send as a voice message (not audio file)\n\n"
+        "This is mandatory to complete your application."
+    ),
+    Language.FA: (
+        "شما باید <b>یک پیام صوتی ضبط کنید</b>.\n\n"
+        "• متن انگلیسی ارائه شده را بخوانید\n"
+        "• ۳۰-۴۵ ثانیه ضبط کنید\n"
+        "• به عنوان پیام صوتی ارسال کنید (نه فایل صوتی)\n\n"
+        "این بخش برای تکمیل درخواست شما اجباری است."
+    ),
+}
+
+ERROR_EMAIL_INVALID = {
+    Language.EN: "⚠️ Please enter a valid email address (e.g., name@example.com)",
+    Language.FA: "⚠️ لطفاً یک آدرس ایمیل معتبر وارد کنید (مثال: name@example.com)",
+}
+
+RATE_LIMIT_MESSAGE = {
+    Language.EN: "⚠️ Too many requests. Please wait a moment and try again.",
+    Language.FA: "⚠️ درخواست‌های زیادی ارسال شده. لطفاً کمی صبر کنید و دوباره تلاش کنید.",
+}
+
+LANGUAGE_REMINDER = {
+    Language.EN: "Please select a language with the buttons below.",
+    Language.FA: "لطفاً با دکمه‌های زیر زبان را انتخاب کنید.",
+}
+
+MAIN_MENU_PROMPT = {
+    Language.EN: "Main menu · Pick a focus area.",
+    Language.FA: "منوی اصلی · یکی از بخش‌ها را انتخاب کنید.",
+}
+
+MENU_HELPER = {
+    Language.EN: "Use the blue buttons below. Tap ⬅️ Back to main menu anytime.",
+    Language.FA: "از دکمه‌های آبی زیر استفاده کنید و هر لحظه می‌توانید ⬅️ بازگشت به منوی اصلی را بزنید.",
+}
+
+MISSING_ANSWER = {
+    Language.EN: "Please share a short answer so we can continue.",
+    Language.FA: "لطفاً یک پاسخ کوتاه بدهید تا ادامه دهیم.",
+}
+
+VOICE_WAITING_REMINDER = {
+    Language.EN: (
+        "<b>⏳ Voice recording required</b>\n\n"
+        "Please record and send your English voice sample.\n"
+        "This is <b>mandatory</b> to complete your application.\n\n"
+        "Or tap ⬅️ Back to cancel and return to main menu."
+    ),
+    Language.FA: (
+        "<b>⏳ ضبط صدا الزامی است</b>\n\n"
+        "لطفاً نمونه صوتی انگلیسی خود را ضبط و ارسال کنید.\n"
+        "این بخش برای تکمیل درخواست شما <b>اجباری</b> است.\n\n"
+        "یا روی ⬅️ بازگشت بزنید تا لغو کنید و به منوی اصلی برگردید."
+    ),
+}
+
+CONTACT_MESSAGE_PROMPT = {
+    Language.EN: "Great — type your message. A human teammate will read it shortly.",
+    Language.FA: "عالی، لطفاً پیام خود را بنویسید. یکی از اعضای تیم به‌زودی آن را می‌خواند.",
+}
+
+VOICE_STATUS_LINE = {
+    Language.EN: "- Voice sample: {status}",
+    Language.FA: "- نمونه صدا: {status}",
+}
+
+VOICE_STATUS_RECEIVED = {
+    Language.EN: "✅ received",
+    Language.FA: "✅ دریافت شد",
+}
+
+VOICE_STATUS_PENDING = {
+    Language.EN: "Pending",
+    Language.FA: "در انتظار",
+}
+VOICE_STATUS_SKIPPED = {
+    Language.EN: "Skipped (team may request later)",
+    Language.FA: "رد شده (ممکن است بعداً درخواست شود)",
+}
+
+HELP_TEXT = {
+    Language.EN: (
+        "I can help you:\n"
+        "• Apply for Codexs roles\n"
+        "• Learn about the studio\n"
+        "• Read updates & news\n"
+        "• Send a contact message\n\n"
+        "Commands: /start · /menu · /help"
+    ),
+    Language.FA: (
+        "می‌توانم کمک کنم:\n"
+        "• ارسال درخواست همکاری Codexs\n"
+        "• آشنایی با استودیو\n"
+        "• دیدن خبرها و به‌روزرسانی‌ها\n"
+        "• ارسال پیام برای تیم\n\n"
+        "دستورات: ‎/start · ‎/menu · ‎/help"
+    ),
+}
+
+EXIT_CONFIRM_PROMPT = {
+    Language.EN: "You have an in-progress flow. Exit and discard it?",
+    Language.FA: "یک فرم در حال تکمیل دارید. می‌خواهید خارج شوید و آن را حذف کنید؟",
+}
+
+EXIT_CONFIRM_CANCEL = {
+    Language.EN: "No problem. Let’s continue where we left off.",
+    Language.FA: "اشکالی ندارد. ادامه می‌دهیم.",
+}
+
+EXIT_CONFIRM_DONE = {
+    Language.EN: "Draft cleared. Returning to main menu.",
+    Language.FA: "پیش‌نویس پاک شد. به منوی اصلی برمی‌گردیم.",
+}
+
+# Error messages
+ERROR_VOICE_TOO_LARGE = {
+    Language.EN: (
+        "⚠️ Voice file is too large (max 20MB).\n"
+        "Please record a shorter message (30-45 seconds) and try again."
+    ),
+    Language.FA: (
+        "⚠️ فایل صوتی خیلی بزرگ است (حداکثر ۲۰ مگابایت).\n"
+        "لطفاً پیام کوتاه‌تری ضبط کنید (۳۰-۴۵ ثانیه) و دوباره تلاش کنید."
+    ),
+}
+
+ERROR_TEXT_TOO_LONG = {
+    Language.EN: "⚠️ Your message is too long. Maximum length is 1000 characters. Please shorten your response.",
+    Language.FA: "⚠️ پیام شما خیلی طولانی است. حداکثر طول ۱۰۰۰ کاراکتر است. لطفاً پاسخ خود را کوتاه کنید.",
+}
+
+ERROR_VOICE_INVALID = {
+    Language.EN: "⚠️ Unable to process this audio file. Please send a voice message (not a file) and try again.",
+    Language.FA: "⚠️ نمی‌توانم این فایل صوتی را پردازش کنم. لطفاً یک پیام صوتی (نه فایل) ارسال کنید و دوباره تلاش کنید.",
+}
+
+ERROR_CONTACT_INVALID = {
+    Language.EN: "⚠️ Contact information is incomplete. Please use the 📱 Share Contact button or type your phone number with country code.",
+    Language.FA: "⚠️ اطلاعات تماس ناقص است. لطفاً از دکمه 📱 اشتراک مخاطب استفاده کنید یا شماره تلفن خود را با کد کشور بنویسید.",
+}
+
+ERROR_LOCATION_INVALID = {
+    Language.EN: "⚠️ Location information is incomplete. Please use the 📍 Share Location button or type: City, Country (Timezone).",
+    Language.FA: "⚠️ اطلاعات موقعیت ناقص است. لطفاً از دکمه 📍 اشتراک موقعیت استفاده کنید یا بنویسید: شهر، کشور (منطقه زمانی).",
+}
+
+ERROR_GROUP_NOTIFICATION_FAILED = {
+    Language.EN: "⚠️ Your application was saved, but we couldn't send a notification to the team. Don't worry, your data is safe and will be reviewed.",
+    Language.FA: "⚠️ درخواست شما ذخیره شد، اما نتوانستیم به تیم اطلاع دهیم. نگران نباشید، اطلاعات شما امن است و بررسی خواهد شد.",
+}
+
+ERROR_GENERIC = {
+    Language.EN: "⚠️ Something went wrong. Please try again or use /menu to return to the main menu.",
+    Language.FA: "⚠️ مشکلی پیش آمد. لطفاً دوباره تلاش کنید یا از /menu برای بازگشت به منوی اصلی استفاده کنید.",
+}
+
+
+def get_language_from_button(label: str) -> Optional[Language]:
+    normalized = label.strip()
+    for lang, button in LANGUAGE_BUTTONS.items():
+        if normalized == button:
+            return lang
+    return None
+
+
+def main_menu_labels(language: Language) -> List[List[str]]:
+    return [
+        [
+            MENU_LABELS["apply"][language],
+            MENU_LABELS["about"][language],
+        ],
+        [
+            MENU_LABELS["updates"][language],
+            MENU_LABELS["contact"][language],
+        ],
+        [
+            MENU_LABELS["switch"][language],
+        ],
+    ]
+
+
+def language_keyboard() -> List[List[str]]:
+    return [[LANGUAGE_BUTTONS[Language.EN], LANGUAGE_BUTTONS[Language.FA]]]
+
+
+def yes_no_keyboard(language: Language) -> List[List[str]]:
+    return [[YES_LABEL[language], NO_LABEL[language]]]
+
+
+def voice_keyboard(language: Language) -> List[List[str]]:
+    """Voice recording is now MANDATORY - no skip button."""
+    return [[BACK_TO_MENU[language]]]
+
+
+def back_keyboard(language: Language) -> List[List[str]]:
+    return [[BACK_TO_MENU[language]]]
+
+
+def switch_language(language: Language) -> Language:
+    return Language.FA if language == Language.EN else Language.EN
+
+
+def is_back_button(text: str, language: Language) -> bool:
+    return text.strip() == BACK_TO_MENU[language]
+
+
+def is_yes(text: str, language: Language) -> bool:
+    return text.strip() == YES_LABEL[language]
+
+
+def is_no(text: str, language: Language) -> bool:
+    return text.strip() == NO_LABEL[language]
+
+
+def is_skip(text: str, language: Language) -> bool:
+    return text.strip().lower() == SKIP_LABEL[language].lower()
+
+
+PERSIAN_DIGITS = {
+    "0": "۰",
+    "1": "۱",
+    "2": "۲",
+    "3": "۳",
+    "4": "۴",
+    "5": "۵",
+    "6": "۶",
+    "7": "۷",
+    "8": "۸",
+    "9": "۹",
+}
+
+
+def localize_number(number: int, language: Language) -> str:
+    if language == Language.EN:
+        return str(number)
+    return "".join(PERSIAN_DIGITS.get(ch, ch) for ch in str(number))
+
+
+def edit_keyboard(language: Language) -> List[List[str]]:
+    rows: List[List[str]] = []
+    numbers = [localize_number(i, language) for i in range(1, 13)]
+    rows.append(numbers[0:3])
+    rows.append(numbers[3:6])
+    rows.append(numbers[6:9])
+    rows.append(numbers[9:12])
+    # Add option 13 for voice re-recording
+    rows.append([localize_number(13, language)])  # "Re-record voice"
+    rows.append([BACK_TO_MENU[language]])
+    return rows
+
+
+def contact_keyboard(language: Language) -> List[List[str]]:
+    """Keyboard for requesting contact sharing."""
+    return [[SHARE_CONTACT_BUTTON[language]], [BACK_TO_MENU[language]]]
+
+
+def location_keyboard(language: Language) -> List[List[str]]:
+    """Keyboard for requesting location sharing."""
+    return [[SHARE_LOCATION_BUTTON[language]], [BACK_TO_MENU[language]]]
+

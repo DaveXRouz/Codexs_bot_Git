@@ -1,0 +1,15 @@
+README.md
+pyproject.toml
+src/codexs_ai_bot.egg-info/PKG-INFO
+src/codexs_ai_bot.egg-info/SOURCES.txt
+src/codexs_ai_bot.egg-info/dependency_links.txt
+src/codexs_ai_bot.egg-info/entry_points.txt
+src/codexs_ai_bot.egg-info/requires.txt
+src/codexs_ai_bot.egg-info/top_level.txt
+src/codexs_bot/__init__.py
+src/codexs_bot/__main__.py
+src/codexs_bot/bot.py
+src/codexs_bot/config.py
+src/codexs_bot/localization.py
+src/codexs_bot/session.py
+src/codexs_bot/storage.py

@@ -1,0 +1,4 @@
+start - Start the Codexs.ai Assistant and select your language
+menu - Return to the main menu
+help - Get help and see what I can do for you
+

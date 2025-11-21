@@ -1,0 +1,96 @@
+Metadata-Version: 2.4
+Name: codexs-ai-bot
+Version: 0.1.0
+Summary: Codexs.ai bilingual Telegram assistant
+Author: Codexs.ai
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: python-telegram-bot==21.5
+Requires-Dist: python-dotenv==1.0.1
+
+# Codexs.ai Telegram Bot
+
+Conversational assistant for Codexs.ai that mirrors the premium, bilingual UX described in the Botpress prompt. The bot routes visitors to the right flows, collects structured hiring data plus an English voice sample, and handles informational and support requests with Tesla / SpaceX-level polish.
+
+## Features
+
+- Bilingual onboarding (English + Farsi) with persistent language memory per user.
+- Main menu covering Jobs, About, Updates, Contact, and instant language switching.
+- Structured 12-step hiring funnel with validation, targeted edits, and English voice-sample capture (audio saved to disk and metadata logged).
+- About / Updates / Contact flows that match the provided tone & layout.
+- JSONL persistence for applications (`data/applications.jsonl`) and contact messages (`data/contact_messages.jsonl`) plus stored voice files (`data/voice_samples/`).
+
+## Requirements
+
+- Python 3.11+
+- Telegram bot token (grab via [@BotFather](https://t.me/BotFather))
+
+Bootstrap the local environment (creates `.venv`, installs editable package + deps):
+
+```bash
+cd /Users/hamzeh/Desktop/Person/codexs_bot
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+## Configuration
+
+1. Copy `env.example` to `.env` (same directory) and fill in your values:
+
+```
+BOT_TOKEN=1234567890:REPLACE_ME
+DATA_DIR=/Users/hamzeh/Desktop/Person/codexs_bot/data
+```
+
+2. `DATA_DIR` is optional; defaults to `codexs_bot/data`. The bot will create:
+   - `applications.jsonl` – structured hiring submissions
+   - `contact_messages.jsonl` – inbound support messages
+   - `voice_samples/` – downloaded `.ogg` / `.mp3` voice notes
+
+## Running
+
+### Quick start (recommended)
+
+```bash
+cd /Users/hamzeh/Desktop/Person/codexs_bot
+./scripts/run_bot.sh
+```
+
+The script ensures the virtualenv exists, installs the package in editable mode, exports `PYTHONPATH=src`, and starts the polling loop. Stop with `Ctrl+C`.
+
+### Manual start
+
+```bash
+cd /Users/hamzeh/Desktop/Person/codexs_bot
+source .venv/bin/activate
+codexs-bot
+# or: python -m codexs_bot.bot
+```
+
+Use whichever method best fits your deployment tooling.
+
+## Workflow Highlights
+
+- `/start` or first DM sends bilingual welcome + language chooser.
+- Main menu stays short + structured with branded buttons and a back-to-main override in every sub-flow.
+- Hiring flow enforces all 12 questions, validates required answers, provides role/experience keyboards, requests an English voice sample, summarizes the data, and stores it once confirmed.
+- Candidates can edit a single field after summary by choosing its number (supports English or Persian numerals).
+- Contact flow shares `contact@codexs.ai`, asks if the user wants to leave a message, and logs it if they do.
+
+## Testing & Customizing
+
+- Run the bot in Telegram, talk to it from multiple accounts, and verify:
+  - Language switching and memory
+  - Each menu branch
+  - Hiring data saved under `data/applications.jsonl`
+  - Voice files written to `data/voice_samples`
+- Update copy or flows via `src/codexs_bot/localization.py`.
+- Add integrations (Sheets, Airtable, etc.) by extending `DataStorage` in `src/codexs_bot/storage.py`.
+
+## Troubleshooting
+
+- Missing voice/audio downloads usually mean the bot token lacks file access or the filesystem path is invalid—double-check `DATA_DIR`.
+- Restart the bot after changing `.env`.
+- Use `pip install --upgrade python-telegram-bot` if Telegram introduces breaking API changes.
+

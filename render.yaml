@@ -1,0 +1,22 @@
+services:
+  - type: worker
+    name: codexs-telegram-bot
+    env: python
+    buildCommand: pip install -e .
+    startCommand: python -m codexs_bot.bot
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: DATA_DIR
+        value: data
+      - key: ENABLE_MEDIA
+        value: true
+      - key: APPLICATION_WEBHOOK_URL
+        sync: false
+      - key: APPLICATION_WEBHOOK_TOKEN
+        sync: false
+      - key: CONTACT_WEBHOOK_URL
+        sync: false
+      - key: GROUP_CHAT_ID
+        sync: false
+

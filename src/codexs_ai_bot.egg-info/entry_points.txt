@@ -1,0 +1,2 @@
+[console_scripts]
+codexs-bot = codexs_bot.bot:main
