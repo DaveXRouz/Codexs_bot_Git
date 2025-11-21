@@ -43,6 +43,7 @@ from .localization import (
     CONTACT_MESSAGE_PROMPT,
     CONTACT_SKIP,
     CONTACT_THANKS,
+    CONTACT_DECISION_REMINDER,
     CONFIRM_PROMPT,
     CONFIRMATION_IMAGE_CAPTION,
     EDIT_PROMPT,
@@ -51,6 +52,7 @@ from .localization import (
     ERROR_GENERIC,
     ERROR_GROUP_NOTIFICATION_FAILED,
     ERROR_LOCATION_INVALID,
+    ERROR_URL_INVALID,
     ERROR_VOICE_INVALID,
     ERROR_VOICE_TOO_LARGE,
     ERROR_TEXT_TOO_LONG,
@@ -543,17 +545,23 @@ async def _maybe_ai_reply(
         return True
 
     context_text = _build_ai_context(session, language)
-    ai_reply = await responder.generate_reply(language, context_text, user_text)
-    if not ai_reply:
-        return False
+    try:
+        ai_reply = await responder.generate_reply(language, context_text, user_text)
+        if not ai_reply:
+            return False
 
-    await update.message.reply_text(
-        ai_reply,
-        parse_mode="HTML",
-        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
-    )
-    session.ai_reply_count += 1
-    return True
+        await update.message.reply_text(
+            ai_reply,
+            parse_mode="HTML",
+            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        )
+        session.ai_reply_count += 1
+        return True
+    except Exception as exc:
+        logger.warning(f"AI fallback failed: {exc}", exc_info=True)
+        # Gracefully degrade - don't show error to user, just return False
+        # The caller will show the standard fallback message
+        return False
 
 
 async def _maybe_answer_user_question(
@@ -823,9 +831,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 )
                 return
             else:
-                # User sent text instead of Yes/No - treat as message
-                session.contact_pending = False
-                await save_contact_message(update, context, session, text)
+                # User sent text instead of Yes/No - show clarification
+                await update.message.reply_text(
+                    CONTACT_DECISION_REMINDER[language],
+                    reply_markup=ReplyKeyboardMarkup(yes_no_keyboard(language), resize_keyboard=True),
+                )
                 return
         else:
             # User is sending the actual message
@@ -1005,6 +1015,42 @@ def _validate_email(email: str) -> bool:
     return bool(re.match(pattern, email.strip()))
 
 
+def _validate_phone(phone: str) -> bool:
+    """Validate phone number format (with country code)."""
+    # Remove common separators and spaces
+    cleaned = re.sub(r'[\s\-\(\)\+]', '', phone.strip())
+    # Should start with + or digits, and have 7-15 digits total
+    pattern = r'^(\+?\d{1,4}[\s\-]?)?\(?\d{1,4}\)?[\s\-]?\d{1,4}[\s\-]?\d{1,9}$'
+    if not re.match(pattern, cleaned):
+        return False
+    # Count digits (should be 7-15)
+    digits = re.sub(r'\D', '', cleaned)
+    return 7 <= len(digits) <= 15
+
+
+def _validate_location(location: str) -> bool:
+    """Validate location format: City, Country (Timezone) or similar."""
+    # Should contain at least a comma or parentheses, indicating structure
+    has_comma = ',' in location
+    has_parens = '(' in location and ')' in location
+    # Should have at least 3 words (city, country, timezone or similar)
+    words = location.split()
+    return (has_comma or has_parens) and len(words) >= 2 and len(location.strip()) >= 5
+
+
+def _validate_url(url: str) -> bool:
+    """Validate URL format (http/https or common domains)."""
+    url = url.strip()
+    # Check for common URL patterns
+    url_pattern = r'^(https?://)?([\da-z\.-]+)\.([a-z\.]{2,6})([/\w \.-]*)*/?$'
+    # Also accept common portfolio platforms without full URL
+    common_domains = ['github.com', 'behance.net', 'dribbble.com', 'linkedin.com', 
+                      'portfolio', 'github', 'behance', 'dribbble']
+    if any(domain in url.lower() for domain in common_domains):
+        return True
+    return bool(re.match(url_pattern, url, re.IGNORECASE))
+
+
 def _validate_text_length(text: str, max_length: int = 1000) -> bool:
     """Validate text input length."""
     return len(text.strip()) <= max_length
@@ -1070,6 +1116,26 @@ async def handle_application_answer(
     if question.key == "email" and cleaned and not _validate_email(cleaned):
         await _warn_and_repeat_question(update, session, question, language, ERROR_EMAIL_INVALID[language])
         return
+
+    # Validate contact (phone number) if typed manually
+    if question.key == "contact" and cleaned and question.input_type == "contact":
+        # Only validate if it's typed text (not from contact button)
+        if not _validate_phone(cleaned):
+            await _warn_and_repeat_question(update, session, question, language, ERROR_CONTACT_INVALID[language])
+            return
+
+    # Validate location if typed manually
+    if question.key == "location" and cleaned and question.input_type == "location":
+        # Only validate if it's typed text (not from location button)
+        if not _validate_location(cleaned):
+            await _warn_and_repeat_question(update, session, question, language, ERROR_LOCATION_INVALID[language])
+            return
+
+    # Validate portfolio URL
+    if question.key == "portfolio" and cleaned:
+        if not _validate_url(cleaned):
+            await _warn_and_repeat_question(update, session, question, language, ERROR_URL_INVALID[language])
+            return
 
     if question.optional and cleaned and is_skip(cleaned, language):
         value = None
@@ -1171,17 +1237,28 @@ async def prompt_confirmation(update: Update, session: UserSession) -> None:
         return
     language = session.language or Language.EN
     session.flow = Flow.CONFIRM
-    summary_lines = [SUMMARY_HEADER[language]]
+    
+    def _truncate_text(text: str, max_length: int = 100) -> str:
+        """Truncate long text with ellipsis."""
+        if len(text) <= max_length:
+            return text
+        return text[:max_length - 3] + "..."
+    
+    summary_lines = [f"<b>{SUMMARY_HEADER[language]}</b>", ""]
     for question in HIRING_QUESTIONS:
         value = session.answers.get(question.key)
         if value is None:
-            display = SKIPPED_TEXT[language]
+            display = f"<i>{SKIPPED_TEXT[language]}</i>"
         elif value:
             # Sanitize HTML in summary to prevent XSS
-            display = _sanitize_html(str(value))
+            sanitized = _sanitize_html(str(value))
+            # Truncate long answers for readability
+            display = _truncate_text(sanitized, max_length=80)
         else:
             display = "—"
-        summary_lines.append(f"- {question.summary_labels[language]}: {display}")
+        summary_lines.append(f"<b>{question.summary_labels[language]}:</b> {display}")
+    
+    summary_lines.append("")  # Add spacing before voice status
     if session.voice_file_path:
         voice_status = VOICE_STATUS_RECEIVED[language]
     elif session.voice_skipped:
@@ -1189,10 +1266,13 @@ async def prompt_confirmation(update: Update, session: UserSession) -> None:
     else:
         voice_status = VOICE_STATUS_PENDING[language]
     summary_lines.append(VOICE_STATUS_LINE[language].format(status=voice_status))
+    summary_lines.append("")  # Add spacing before confirmation prompt
     summary_lines.append(CONFIRM_PROMPT[language])
+    
     await update.message.reply_text(
         "\n".join(summary_lines),
         reply_markup=ReplyKeyboardMarkup(yes_no_keyboard(language), resize_keyboard=True),
+        parse_mode="HTML",
     )
 
 

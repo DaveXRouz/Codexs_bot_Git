@@ -208,7 +208,7 @@ HIRING_QUESTIONS: List[Question] = [
         key="contact",
         prompts={
             Language.EN: "<b>How can we reach you?</b>\n<i>Tap 📱 Share Contact or type your phone number with country code</i>",
-            Language.FA: "<b>چگونه می‌توانیم با شما تماس بگیریم؟</b>\n<i>روی 📱 اشتراک مخاطب بزنید یا شماره تلفن همراه با کد کشور را بنویسید</i>",
+            Language.FA: "<b>چگونه می‌توانیم با شما تماس بگیریم؟</b>\n<i>روی دکمه 📱 اشتراک مخاطب بزنید یا شماره تلفن همراه با کد کشور را بنویسید</i>",
         },
         summary_labels={
             Language.EN: "Contact method",
@@ -220,7 +220,7 @@ HIRING_QUESTIONS: List[Question] = [
         key="location",
         prompts={
             Language.EN: "<b>Where are you based?</b>\n<i>Tap 📍 Share Location or type: City, Country (Timezone)</i>",
-            Language.FA: "<b>کجا زندگی می‌کنید؟</b>\n<i>روی 📍 اشتراک موقعیت بزنید یا بنویسید: شهر، کشور (منطقه زمانی)</i>",
+            Language.FA: "<b>کجا زندگی می‌کنید؟</b>\n<i>روی دکمه 📍 اشتراک موقعیت بزنید یا بنویسید: شهر، کشور (منطقه زمانی)</i>",
         },
         summary_labels={
             Language.EN: "Location & time zone",
@@ -355,17 +355,21 @@ VOICE_SAMPLE_TEXT = (
 VOICE_PROMPT = {
     Language.EN: (
         "<b>📣 English Voice Test (Required)</b>\n\n"
-        "Please read this text out loud and send a voice message:\n\n"
+        "Why this matters: Codexs works with global teams. Clear English communication is essential for remote collaboration, daily standups, and client interactions.\n\n"
+        "What to do: Read the text below out loud and send a voice message.\n\n"
         f"<i>\"{VOICE_SAMPLE_TEXT}\"</i>\n\n"
         "⏱ Duration: 30-45 seconds\n"
-        "🎯 We evaluate: clarity, fluency, pronunciation"
+        "🎯 We evaluate: clarity, fluency, pronunciation\n\n"
+        "💡 Tip: Speak naturally and at a comfortable pace."
     ),
     Language.FA: (
         "<b>📣 تست صوتی انگلیسی (اجباری)</b>\n\n"
-        "لطفاً این متن را با صدای بلند بخوانید و یک پیام صوتی ارسال کنید:\n\n"
+        "چرا مهم است: Codexs با تیم‌های جهانی کار می‌کند. ارتباط واضح به انگلیسی برای همکاری از راه دور، جلسات روزانه و تعامل با مشتری ضروری است.\n\n"
+        "چه کاری انجام دهید: متن زیر را با صدای بلند بخوانید و یک پیام صوتی ارسال کنید.\n\n"
         f"<i>\"{VOICE_SAMPLE_TEXT}\"</i>\n\n"
         "⏱ مدت زمان: ۳۰-۴۵ ثانیه\n"
-        "🎯 ما ارزیابی می‌کنیم: وضوح، روانی، تلفظ"
+        "🎯 ما ارزیابی می‌کنیم: وضوح، روانی، تلفظ\n\n"
+        "💡 نکته: به صورت طبیعی و با سرعت راحت صحبت کنید."
     ),
 }
 
@@ -852,13 +856,40 @@ ERROR_VOICE_INVALID = {
 }
 
 ERROR_CONTACT_INVALID = {
-    Language.EN: "⚠️ Contact information is incomplete. Please use the 📱 Share Contact button or type your phone number with country code.",
-    Language.FA: "⚠️ اطلاعات تماس ناقص است. لطفاً از دکمه 📱 اشتراک مخاطب استفاده کنید یا شماره تلفن خود را با کد کشور بنویسید.",
+    Language.EN: (
+        "⚠️ Please enter a valid phone number with country code.\n"
+        "Example: +1 234 567 8900 or +98 912 345 6789\n"
+        "Or use the 📱 Share Contact button above."
+    ),
+    Language.FA: (
+        "⚠️ لطفاً شماره تلفن معتبر با کد کشور وارد کنید.\n"
+        "مثال: +1 234 567 8900 یا +98 912 345 6789\n"
+        "یا از دکمه 📱 اشتراک مخاطب استفاده کنید."
+    ),
 }
 
 ERROR_LOCATION_INVALID = {
-    Language.EN: "⚠️ Location information is incomplete. Please use the 📍 Share Location button or type: City, Country (Timezone).",
-    Language.FA: "⚠️ اطلاعات موقعیت ناقص است. لطفاً از دکمه 📍 اشتراک موقعیت استفاده کنید یا بنویسید: شهر، کشور (منطقه زمانی).",
+    Language.EN: (
+        "⚠️ Please enter location in format: City, Country (Timezone)\n"
+        "Example: Tehran, Iran (UTC+3:30) or New York, USA (EST)\n"
+        "Or use the 📍 Share Location button above."
+    ),
+    Language.FA: (
+        "⚠️ لطفاً موقعیت را به فرمت: شهر، کشور (منطقه زمانی) بنویسید\n"
+        "مثال: تهران، ایران (UTC+3:30) یا نیویورک، آمریکا (EST)\n"
+        "یا از دکمه 📍 اشتراک موقعیت استفاده کنید."
+    ),
+}
+
+ERROR_URL_INVALID = {
+    Language.EN: (
+        "⚠️ Please enter a valid URL or portfolio link.\n"
+        "Examples: https://github.com/username, https://behance.net/portfolio, or your website URL."
+    ),
+    Language.FA: (
+        "⚠️ لطفاً یک لینک معتبر یا آدرس پورتفولیو وارد کنید.\n"
+        "مثال: https://github.com/username، https://behance.net/portfolio یا آدرس وب‌سایت شما."
+    ),
 }
 
 ERROR_GROUP_NOTIFICATION_FAILED = {
