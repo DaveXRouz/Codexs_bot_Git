@@ -698,8 +698,14 @@ HELP_TEXT_VOICE = {
 }
 
 ERROR_EMAIL_INVALID = {
-    Language.EN: "⚠️ Please enter a valid email address (e.g., name@example.com)",
-    Language.FA: "⚠️ لطفاً یک آدرس ایمیل معتبر وارد کنید (مثال: name@example.com)",
+    Language.EN: (
+        "⚠️ Please enter a valid email address (e.g., name@example.com).\n"
+        "Use the standard format or tap ⬅️ Back / type /menu to exit this form."
+    ),
+    Language.FA: (
+        "⚠️ لطفاً یک آدرس ایمیل معتبر وارد کنید (مثال: name@example.com).\n"
+        "آدرس را با فرمت استاندارد بنویسید یا با ⬅️ بازگشت / دستور ‎/menu‎ فرم را ترک کنید."
+    ),
 }
 
 RATE_LIMIT_MESSAGE = {
@@ -723,8 +729,14 @@ MENU_HELPER = {
 }
 
 MISSING_ANSWER = {
-    Language.EN: "Please share a short answer so we can continue.",
-    Language.FA: "لطفاً یک پاسخ کوتاه بدهید تا ادامه دهیم.",
+    Language.EN: (
+        "Please share a short answer so we can continue.\n"
+        "Need to stop? Tap ⬅️ Back or type /menu."
+    ),
+    Language.FA: (
+        "لطفاً یک پاسخ کوتاه بدهید تا ادامه دهیم.\n"
+        "اگر می‌خواهید خارج شوید، ⬅️ بازگشت یا ‎/menu‎ را بزنید."
+    ),
 }
 
 VOICE_WAITING_REMINDER = {
@@ -922,6 +934,11 @@ _NO_KEYWORDS = {
 _SKIP_KEYWORDS = {
     Language.EN: {"skip", "pass", "later", "notnow"},
     Language.FA: {"رد", "ردکردن", "بعدا", "بعداً", "فعلاخیر", "بیخیال"},
+}
+
+_QUESTION_KEYWORDS = {
+    Language.EN: {"what", "why", "how", "help", "explain", "where", "who"},
+    Language.FA: {"چی", "چطور", "چرا", "کمک", "کجا", "کی"},
 }
 
 

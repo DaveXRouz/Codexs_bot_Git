@@ -152,6 +152,11 @@ _REPEAT_COMMANDS = {
     Language.FA: {"تکرار", "دوباره", "چی", "??"},
 }
 
+_QUESTION_KEYWORDS = {
+    Language.EN: {"what", "why", "how", "help", "where", "who"},
+    Language.FA: {"چی", "چطور", "چرا", "کمک", "کجا", "کی"},
+}
+
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm"}
 
 AI_MAX_RESPONSES = 5
@@ -206,6 +211,16 @@ def _is_back_command(text: str, language: Language) -> bool:
 def _is_repeat_command(text: str, language: Language) -> bool:
     collapsed = _collapse_intent_token(text)
     return collapsed in _REPEAT_COMMANDS[language] or text.strip() in {"?", "؟"}
+
+
+def _looks_like_question(text: str, language: Language) -> bool:
+    if "?" in text:
+        return True
+    normalized = _normalize_for_intent(text)
+    for keyword in _QUESTION_KEYWORDS[language]:
+        if keyword in normalized:
+            return True
+    return False
 
 
 def _match_menu_button(text: str, language: Language) -> Optional[str]:
@@ -541,6 +556,18 @@ async def _maybe_ai_reply(
     return True
 
 
+async def _maybe_answer_user_question(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+    user_text: str,
+) -> None:
+    language = session.language or Language.EN
+    if not _looks_like_question(user_text, language):
+        return
+    await _maybe_ai_reply(update, context, session, user_text)
+
+
 async def _open_menu_section(
     key: str,
     update: Update,
@@ -650,6 +677,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if choice is None:
             await send_language_prompt(update)
             return
+        session.reset_hiring()
         session.language = choice
         await send_language_welcome(update, context, session)
         await show_main_menu(update, session)
@@ -755,7 +783,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     if session.flow == Flow.APPLY:
-        await handle_application_answer(update, session, text)
+        await handle_application_answer(update, context, session, text)
         return
 
     if session.flow == Flow.CONFIRM:
@@ -987,7 +1015,27 @@ def _sanitize_html(text: str) -> str:
     return html.escape(text, quote=True)
 
 
-async def handle_application_answer(update: Update, session: UserSession, text: str) -> None:
+async def _warn_and_repeat_question(
+    update: Update,
+    session: UserSession,
+    question,
+    language: Language,
+    warning_text: str,
+) -> None:
+    keyboard_rows = question.keyboard[language] if question.keyboard else None
+    await update.message.reply_text(
+        warning_text,
+        reply_markup=_keyboard_with_back(keyboard_rows, language),
+    )
+    await ask_current_question(update, session)
+
+
+async def handle_application_answer(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+    text: str,
+) -> None:
     if not update.message:
         return
     language = session.language or Language.EN
@@ -1000,46 +1048,31 @@ async def handle_application_answer(update: Update, session: UserSession, text: 
         if _is_repeat_command(cleaned, language):
             await ask_current_question(update, session)
             return
+        await _maybe_answer_user_question(update, context, session, cleaned)
 
-    if not cleaned and not question.optional:
-        keyboard_rows = question.keyboard[language] if question.keyboard else None
-        await update.message.reply_text(
-            MISSING_ANSWER[language],
-            reply_markup=_keyboard_with_back(keyboard_rows, language),
-        )
-        return
+    value: Optional[str] = cleaned or None
+
+    if not cleaned:
+        if question.optional:
+            value = None
+        else:
+            await _warn_and_repeat_question(update, session, question, language, MISSING_ANSWER[language])
+            return
 
     if not question.optional and cleaned and is_skip(cleaned, language):
-        keyboard_rows = question.keyboard[language] if question.keyboard else None
-        await update.message.reply_text(
-            MISSING_ANSWER[language],
-            reply_markup=_keyboard_with_back(keyboard_rows, language),
-        )
+        await _warn_and_repeat_question(update, session, question, language, MISSING_ANSWER[language])
         return
-    
-    # Text length validation (prevent DoS attacks)
+
     if cleaned and not _validate_text_length(cleaned, max_length=1000):
-        await update.message.reply_text(
-            ERROR_TEXT_TOO_LONG[language],
-            reply_markup=_keyboard_with_back(None, language),
-            parse_mode="HTML",
-        )
+        await _warn_and_repeat_question(update, session, question, language, ERROR_TEXT_TOO_LONG[language])
         return
-    
-    # Email validation for email question
-    if question.key == "email" and cleaned:
-        if not _validate_email(cleaned):
-            await update.message.reply_text(
-                ERROR_EMAIL_INVALID[language],
-                reply_markup=_keyboard_with_back(None, language),
-                parse_mode="HTML",
-            )
-            return
-    
+
+    if question.key == "email" and cleaned and not _validate_email(cleaned):
+        await _warn_and_repeat_question(update, session, question, language, ERROR_EMAIL_INVALID[language])
+        return
+
     if question.optional and cleaned and is_skip(cleaned, language):
-        value: Optional[str] = None
-    else:
-        value = cleaned
+        value = None
     session.answers[question.key] = value
     logger.info(f"Saved answer for '{question.key}': '{value}' (Question {session.question_index + 1}/{len(HIRING_QUESTIONS)})")
     if session.edit_mode:
