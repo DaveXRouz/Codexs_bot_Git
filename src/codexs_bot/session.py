@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from enum import Enum, auto
 from typing import Any, Dict, Optional
 
@@ -33,6 +34,9 @@ class UserSession:
     exit_confirmation_pending: bool = False
     exit_confirmation_flow: Optional[Flow] = None
     awaiting_view_roles: bool = False
+    last_menu_choice: Optional[str] = None
+    ai_reply_count: int = 0
+    ai_window_start: Optional[datetime] = None
 
     def reset_hiring(self) -> None:
         self.flow = Flow.IDLE
@@ -49,6 +53,7 @@ class UserSession:
         self.exit_confirmation_pending = False
         self.exit_confirmation_flow = None
         self.awaiting_view_roles = False
+        self.last_menu_choice = None
 
     def start_hiring(self) -> None:
         self.flow = Flow.APPLY
@@ -65,6 +70,7 @@ class UserSession:
         self.exit_confirmation_pending = False
         self.exit_confirmation_flow = None
         self.awaiting_view_roles = False
+        self.last_menu_choice = "apply"
 
     def mark_voice_wait(self) -> None:
         self.waiting_voice = True

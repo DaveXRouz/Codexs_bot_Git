@@ -656,6 +656,11 @@ SMART_FALLBACK_HINT = {
     Language.FA: "به نظر می‌رسد دنبال <b>{topic}</b> هستید. همان بخش را برایتان باز می‌کنم.",
 }
 
+AI_RATE_LIMIT_MESSAGE = {
+    Language.EN: "⚠️ I’m handling a lot right now. Please use the menu or try again shortly.",
+    Language.FA: "⚠️ در حال پاسخ‌گویی زیاد هستم. لطفاً از منو استفاده کنید یا چند لحظه بعد دوباره تلاش کنید.",
+}
+
 HELP_TEXT_APPLY = {
     Language.EN: (
         "You're in the <b>application flow</b>.\n\n"
@@ -906,12 +911,17 @@ def is_back_button(text: str, language: Language) -> bool:
 
 _YES_KEYWORDS = {
     Language.EN: {"yes", "y", "yeah", "yep", "sure", "ok", "okay", "affirmative", "confirm"},
-    Language.FA: {"بله", "بلی", "اره", "آره", "اوکی", "باشه", "حتماً"},
+    Language.FA: {"بله", "بلی", "اره", "آره", "اوکی", "باشه", "حتما", "حتماً"},
 }
 
 _NO_KEYWORDS = {
-    Language.EN: {"no", "n", "nope", "nah", "cancel", "stop"},
-    Language.FA: {"خیر", "نه", "نخیر", "بیخیال", "لغو"},
+    Language.EN: {"no", "n", "nope", "nah"},
+    Language.FA: {"خیر", "نه", "نخیر"},
+}
+
+_SKIP_KEYWORDS = {
+    Language.EN: {"skip", "pass", "later", "notnow"},
+    Language.FA: {"رد", "ردکردن", "بعدا", "بعداً", "فعلاخیر", "بیخیال"},
 }
 
 
@@ -938,7 +948,11 @@ def is_no(text: str, language: Language) -> bool:
 
 
 def is_skip(text: str, language: Language) -> bool:
-    return text.strip().lower() == SKIP_LABEL[language].lower()
+    stripped = text.strip()
+    if stripped.lower() == SKIP_LABEL[language].lower():
+        return True
+    normalized = _normalize_answer(stripped)
+    return normalized in _SKIP_KEYWORDS[language]
 
 
 PERSIAN_DIGITS = {

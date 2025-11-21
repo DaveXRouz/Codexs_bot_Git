@@ -27,6 +27,7 @@ from .localization import (
     ABOUT_MEDIA,
     ABOUT_SECTIONS,
     ABOUT_TEXT,
+    AI_RATE_LIMIT_MESSAGE,
     BACK_TO_MENU,
     BILINGUAL_WELCOME,
     COMMANDS_TEXT,
@@ -136,7 +137,25 @@ _MENU_KEYWORDS = {
     },
 }
 
+_MENU_COMMANDS = {
+    Language.EN: {"menu", "mainmenu", "startover", "cancel", "stop", "quit", "restart"},
+    Language.FA: {"منو", "منویاصلی", "بازگشتبمنو", "بازگشتبهمنو", "لغو"},
+}
+
+_BACK_COMMANDS = {
+    Language.EN: {"back", "previous", "goback"},
+    Language.FA: {"بازگشت", "برگشت", "قبلی"},
+}
+
+_REPEAT_COMMANDS = {
+    Language.EN: {"repeat", "again", "what", "pardon", "huh"},
+    Language.FA: {"تکرار", "دوباره", "چی", "??"},
+}
+
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm"}
+
+AI_MAX_RESPONSES = 5
+AI_WINDOW = timedelta(minutes=10)
 
 
 def _check_rate_limit(user_id: int) -> bool:
@@ -168,6 +187,25 @@ def _format_hiring_intro(language: Language) -> str:
 def _normalize_for_intent(text: str) -> str:
     normalized = re.sub(r"[^a-zA-Z0-9\u0600-\u06FF\s]", " ", text)
     return normalized.lower()
+
+
+def _collapse_intent_token(text: str) -> str:
+    return _normalize_for_intent(text).replace(" ", "")
+
+
+def _is_menu_command(text: str, language: Language) -> bool:
+    collapsed = _collapse_intent_token(text)
+    return collapsed in _MENU_COMMANDS[language]
+
+
+def _is_back_command(text: str, language: Language) -> bool:
+    collapsed = _collapse_intent_token(text)
+    return collapsed in _BACK_COMMANDS[language]
+
+
+def _is_repeat_command(text: str, language: Language) -> bool:
+    collapsed = _collapse_intent_token(text)
+    return collapsed in _REPEAT_COMMANDS[language] or text.strip() in {"?", "؟"}
 
 
 def _match_menu_button(text: str, language: Language) -> Optional[str]:
@@ -341,6 +379,7 @@ async def show_main_menu(update: Update, session: UserSession) -> None:
     if not update.message:
         return
     language = session.language or Language.EN
+    session.last_menu_choice = None
     await update.message.reply_text(
         f"{MAIN_MENU_PROMPT[language]}\n{MENU_HELPER[language]}",
         reply_markup=ReplyKeyboardMarkup(
@@ -404,18 +443,66 @@ def _get_ai_responder(context: ContextTypes.DEFAULT_TYPE) -> Optional[OpenAIFall
     return context.application.bot_data.get("ai_responder")  # type: ignore[return-value]
 
 
-def _summarize_session_state(session: UserSession) -> str:
+def _summarize_session_state(session: UserSession, language: Language) -> str:
     if session.flow == Flow.APPLY:
-        return f"User is filling the hiring application (question {session.question_index + 1})."
-    if session.flow == Flow.CONFIRM:
-        return "User is reviewing the summary before submission."
-    if session.flow == Flow.CONTACT_MESSAGE and session.contact_pending:
-        return "User is deciding whether to leave a contact/support message."
-    if session.flow == Flow.CONTACT_MESSAGE:
-        return "User is composing a contact/support message."
+        summary = f"User is filling the hiring application (question {session.question_index + 1}/12)."
+    elif session.flow == Flow.CONFIRM:
+        summary = "User is reviewing answers before submission."
+    elif session.flow == Flow.CONTACT_MESSAGE and session.contact_pending:
+        summary = "User is deciding whether to leave a contact/support message."
+    elif session.flow == Flow.CONTACT_MESSAGE:
+        summary = "User is composing a contact/support message."
+    elif session.waiting_voice:
+        summary = "User must submit the mandatory English voice sample."
+    else:
+        summary = "User is at the main menu."
+
+    extras: List[str] = []
+    if session.last_menu_choice:
+        topic = MENU_TOPIC_TITLES.get(session.last_menu_choice, {}).get(language)
+        if topic:
+            extras.append(f"Last selected focus: {topic}.")
+    if session.answers:
+        extras.append(f"{len([v for v in session.answers.values() if v])} answers saved so far.")
     if session.waiting_voice:
-        return "User must submit the mandatory English voice sample."
-    return "User is at the main menu."
+        extras.append("Voice sample is still pending.")
+    return " ".join([summary] + extras)
+
+
+def _build_ai_context(session: UserSession, language: Language) -> str:
+    parts = [_summarize_session_state(session, language)]
+    if session.flow == Flow.APPLY and 0 <= session.question_index < len(HIRING_QUESTIONS):
+        question = HIRING_QUESTIONS[session.question_index]
+        parts.append(f"Current question ({question.key}): {question.prompts[language]}")
+    return "\n".join(parts)
+
+
+def _reset_ai_window(session: UserSession) -> None:
+    now = datetime.now(timezone.utc)
+    if not session.ai_window_start or now - session.ai_window_start > AI_WINDOW:
+        session.ai_window_start = now
+        session.ai_reply_count = 0
+
+
+def _needs_exit_confirmation(session: UserSession) -> bool:
+    return (
+        session.flow in {Flow.APPLY, Flow.CONFIRM, Flow.CONTACT_MESSAGE}
+        or session.waiting_voice
+        or session.contact_pending
+        or session.awaiting_edit_selection
+    )
+
+
+async def _prompt_exit_confirmation(
+    update: Update,
+    session: UserSession,
+    language: Language,
+) -> None:
+    session.request_exit_confirmation(session.flow or Flow.IDLE)
+    await update.message.reply_text(
+        EXIT_CONFIRM_PROMPT[language],
+        reply_markup=ReplyKeyboardMarkup(yes_no_keyboard(language), resize_keyboard=True),
+    )
 
 
 async def _maybe_ai_reply(
@@ -431,7 +518,16 @@ async def _maybe_ai_reply(
         return False
 
     language = session.language or Language.EN
-    context_text = _summarize_session_state(session)
+    _reset_ai_window(session)
+    if session.ai_reply_count >= AI_MAX_RESPONSES:
+        await update.message.reply_text(
+            AI_RATE_LIMIT_MESSAGE[language],
+            parse_mode="HTML",
+            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        )
+        return True
+
+    context_text = _build_ai_context(session, language)
     ai_reply = await responder.generate_reply(language, context_text, user_text)
     if not ai_reply:
         return False
@@ -441,6 +537,7 @@ async def _maybe_ai_reply(
         parse_mode="HTML",
         reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
     )
+    session.ai_reply_count += 1
     return True
 
 
@@ -453,6 +550,7 @@ async def _open_menu_section(
 ) -> None:
     if not update.message:
         return
+    session.last_menu_choice = key
 
     if key == "apply":
         session.start_hiring()
@@ -558,6 +656,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     language = session.language
+
+    if _is_menu_command(text, language) or _is_back_command(text, language):
+        if _needs_exit_confirmation(session):
+            await _prompt_exit_confirmation(update, session, language)
+        else:
+            session.reset_hiring()
+            await show_main_menu(update, session)
+        return
 
     if session.exit_confirmation_pending:
         await handle_exit_confirmation(update, session, text)
@@ -720,6 +826,7 @@ async def handle_main_menu_choice(
     language = session.language or Language.EN
     session.contact_pending = False
     session.flow = Flow.IDLE
+    session.last_menu_choice = None
     matched_key = _match_menu_button(text, language)
     if matched_key in {"apply", "about", "updates", "contact"}:
         await _open_menu_section(matched_key, update, context, session, language)
@@ -886,7 +993,23 @@ async def handle_application_answer(update: Update, session: UserSession, text: 
     language = session.language or Language.EN
     question = HIRING_QUESTIONS[session.question_index]
     cleaned = text.strip()
+    if cleaned:
+        if _is_menu_command(cleaned, language) or _is_back_command(cleaned, language) or is_back_button(cleaned, language):
+            await _prompt_exit_confirmation(update, session, language)
+            return
+        if _is_repeat_command(cleaned, language):
+            await ask_current_question(update, session)
+            return
+
     if not cleaned and not question.optional:
+        keyboard_rows = question.keyboard[language] if question.keyboard else None
+        await update.message.reply_text(
+            MISSING_ANSWER[language],
+            reply_markup=_keyboard_with_back(keyboard_rows, language),
+        )
+        return
+
+    if not question.optional and cleaned and is_skip(cleaned, language):
         keyboard_rows = question.keyboard[language] if question.keyboard else None
         await update.message.reply_text(
             MISSING_ANSWER[language],
@@ -913,7 +1036,7 @@ async def handle_application_answer(update: Update, session: UserSession, text: 
             )
             return
     
-    if question.optional and is_skip(cleaned, language):
+    if question.optional and cleaned and is_skip(cleaned, language):
         value: Optional[str] = None
     else:
         value = cleaned
