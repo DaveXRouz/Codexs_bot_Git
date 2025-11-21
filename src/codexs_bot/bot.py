@@ -1975,35 +1975,59 @@ async def handle_location_shared(update: Update, context: ContextTypes.DEFAULT_T
         )
 
 
+async def handle_test_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Test command to verify handlers work."""
+    if update.message:
+        await update.message.reply_text("✅ Command handler is working!")
+
+
 async def handle_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Admin panel menu."""
-    if not update.message or not update.effective_user:
-        return
-    
-    user_id = update.effective_user.id
-    logger.info(f"Admin command received from user {user_id}")
-    
-    # Always show debug info first to help troubleshoot
-    settings = _get_settings(context)
-    is_admin = user_id in settings.admin_user_ids
-    
-    if not is_admin:
-        debug_msg = (
-            f"🔍 <b>Debug Info</b>\n\n"
-            f"Your User ID: <code>{user_id}</code>\n"
-            f"Configured Admin IDs: <code>{settings.admin_user_ids}</code>\n"
-            f"Admin Check: ❌ Failed\n\n"
-            f"{ADMIN_ACCESS_DENIED[Language.EN]}"
+    try:
+        if not update.message or not update.effective_user:
+            logger.warning("Admin command: missing message or user")
+            return
+        
+        user_id = update.effective_user.id
+        logger.info(f"Admin command received from user {user_id}")
+        
+        # Always show debug info first to help troubleshoot
+        try:
+            settings = _get_settings(context)
+            admin_ids = settings.admin_user_ids
+            is_admin = user_id in admin_ids
+        except Exception as e:
+            logger.error(f"Error getting settings: {e}", exc_info=True)
+            await update.message.reply_text(
+                f"❌ Error checking admin status: {str(e)}",
+                parse_mode="HTML",
+            )
+            return
+        
+        if not is_admin:
+            debug_msg = (
+                f"🔍 <b>Debug Info</b>\n\n"
+                f"Your User ID: <code>{user_id}</code>\n"
+                f"Configured Admin IDs: <code>{admin_ids}</code>\n"
+                f"Admin Check: ❌ Failed\n\n"
+                f"{ADMIN_ACCESS_DENIED[Language.EN]}"
+            )
+            await update.message.reply_text(debug_msg, parse_mode="HTML")
+            return
+        
+        session = get_session(context.user_data)
+        language = session.language or Language.EN
+        await update.message.reply_text(
+            ADMIN_MENU[language],
+            parse_mode="HTML",
         )
-        await update.message.reply_text(debug_msg, parse_mode="HTML")
-        return
-    
-    session = get_session(context.user_data)
-    language = session.language or Language.EN
-    await update.message.reply_text(
-        ADMIN_MENU[language],
-        parse_mode="HTML",
-    )
+    except Exception as e:
+        logger.error(f"Error in handle_admin: {e}", exc_info=True)
+        if update.message:
+            await update.message.reply_text(
+                f"❌ Error: {str(e)}\n\nPlease check bot logs.",
+                parse_mode="HTML",
+            )
 
 
 async def handle_admin_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2280,6 +2304,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", handle_help))
     application.add_handler(CommandHandler("commands", handle_commands))
     # Admin commands
+    application.add_handler(CommandHandler("testadmin", handle_test_admin))
     application.add_handler(CommandHandler("admin", handle_admin))
     application.add_handler(CommandHandler("status", handle_admin_status))
     application.add_handler(CommandHandler("stats", handle_admin_stats))
@@ -2291,6 +2316,8 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
     logger.info("Codexs Telegram bot started.")
+    logger.info(f"Admin User IDs configured: {settings.admin_user_ids}")
+    logger.info(f"Total admin commands registered: 5 (admin, status, stats, debug, sessions)")
     application.run_polling()
 
 
