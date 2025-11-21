@@ -1676,6 +1676,13 @@ async def handle_contact_shared(update: Update, context: ContextTypes.DEFAULT_TY
     logger.info(f"Saved contact answer for '{question.key}': '{contact_info}' (Question {session.question_index + 1}/{len(HIRING_QUESTIONS)})")
     await update.message.reply_text(CONTACT_SHARED_ACK[language])
     
+    # If in edit mode, go to confirmation instead of next question
+    if session.edit_mode:
+        session.edit_mode = False
+        session.flow = Flow.CONFIRM
+        await prompt_confirmation(update, session)
+        return
+    
     # Move to next question
     session.question_index += 1
     if session.question_index < len(HIRING_QUESTIONS):
@@ -1722,6 +1729,13 @@ async def handle_location_shared(update: Update, context: ContextTypes.DEFAULT_T
     session.answers[question.key] = location_info
     logger.info(f"Saved location answer for '{question.key}': '{location_info}' (Question {session.question_index + 1}/{len(HIRING_QUESTIONS)})")
     await update.message.reply_text(LOCATION_SHARED_ACK[language])
+    
+    # If in edit mode, go to confirmation instead of next question
+    if session.edit_mode:
+        session.edit_mode = False
+        session.flow = Flow.CONFIRM
+        await prompt_confirmation(update, session)
+        return
     
     # Move to next question
     session.question_index += 1
