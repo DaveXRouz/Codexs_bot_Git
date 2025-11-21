@@ -94,6 +94,9 @@ from .localization import (
     QUESTION_PROGRESS,
     RATE_LIMIT_MESSAGE,
     RERECORD_VOICE_PROMPT,
+    RESUME_PROMPT,
+    RESUME_YES,
+    RESUME_NO,
     back_keyboard,
     contact_keyboard,
     edit_keyboard,
@@ -359,6 +362,37 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
     session = get_session(context.user_data)
+    
+    # Try to load saved session
+    saved_session = await _load_session(update, context)
+    if saved_session and saved_session.language and saved_session.has_incomplete_application():
+        # Restore session and offer resume
+        session.language = saved_session.language
+        session.flow = saved_session.flow
+        session.question_index = saved_session.question_index
+        session.answers = saved_session.answers.copy()
+        session.waiting_voice = saved_session.waiting_voice
+        session.voice_file_path = saved_session.voice_file_path
+        session.voice_file_id = saved_session.voice_file_id
+        session.voice_message_id = saved_session.voice_message_id
+        session.voice_skipped = saved_session.voice_skipped
+        session.user_chat_id = saved_session.user_chat_id
+        session.last_menu_choice = saved_session.last_menu_choice
+        
+        language = session.language
+        progress = len([v for v in session.answers.values() if v])
+        await _send_landing_card(update, context)
+        await update.message.reply_text(
+            RESUME_PROMPT[language].format(progress=progress),
+            reply_markup=ReplyKeyboardMarkup(
+                [[RESUME_YES[language], RESUME_NO[language]]],
+                resize_keyboard=True,
+            ),
+            parse_mode="HTML",
+        )
+        return
+    
+    # No saved session or no incomplete application - start fresh
     session.reset_hiring()
     session.language = None
     session.flow = Flow.IDLE
@@ -458,6 +492,26 @@ def _get_contact_notifier(context: ContextTypes.DEFAULT_TYPE) -> WebhookNotifier
 
 def _get_ai_responder(context: ContextTypes.DEFAULT_TYPE) -> Optional[OpenAIFallback]:
     return context.application.bot_data.get("ai_responder")  # type: ignore[return-value]
+
+
+async def _save_session(update: Update, context: ContextTypes.DEFAULT_TYPE, session: UserSession) -> None:
+    """Save session to disk for persistence."""
+    if not update.effective_user:
+        return
+    storage = _get_storage(context)
+    session_data = session.to_dict()
+    await storage.save_session(update.effective_user.id, session_data)
+
+
+async def _load_session(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Optional[UserSession]:
+    """Load session from disk if available."""
+    if not update.effective_user:
+        return None
+    storage = _get_storage(context)
+    session_data = await storage.load_session(update.effective_user.id)
+    if session_data:
+        return UserSession.from_dict(session_data)
+    return None
 
 
 def _summarize_session_state(session: UserSession, language: Language) -> str:
@@ -692,6 +746,42 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     language = session.language
+
+    # Handle resume response
+    if session.flow == Flow.IDLE and session.has_incomplete_application():
+        if text == RESUME_YES[language] or is_yes(text, language):
+            # Resume application
+            if session.waiting_voice:
+                session.flow = Flow.APPLY  # Will be set to CONFIRM after voice
+                await update.message.reply_text(
+                    VOICE_PROMPT[language],
+                    reply_markup=_keyboard_with_back(None, language),
+                    parse_mode="HTML",
+                )
+            else:
+                session.flow = Flow.APPLY
+                await ask_current_question(update, session)
+            await _save_session(update, context, session)
+            return
+        elif text == RESUME_NO[language] or is_no(text, language):
+            # Start fresh - delete saved session
+            if update.effective_user:
+                storage = _get_storage(context)
+                await storage.delete_session(update.effective_user.id)
+            session.reset_hiring()
+            await show_main_menu(update, session)
+            return
+        else:
+            # Remind user to use buttons
+            await update.message.reply_text(
+                RESUME_PROMPT[language].format(progress=len([v for v in session.answers.values() if v])),
+                reply_markup=ReplyKeyboardMarkup(
+                    [[RESUME_YES[language], RESUME_NO[language]]],
+                    resize_keyboard=True,
+                ),
+                parse_mode="HTML",
+            )
+            return
 
     if _is_menu_command(text, language) or _is_back_command(text, language):
         if _needs_exit_confirmation(session):
@@ -1141,6 +1231,7 @@ async def handle_application_answer(
         value = None
     session.answers[question.key] = value
     logger.info(f"Saved answer for '{question.key}': '{value}' (Question {session.question_index + 1}/{len(HIRING_QUESTIONS)})")
+    await _save_session(update, context, session)
     if session.edit_mode:
         session.edit_mode = False
         session.flow = Flow.CONFIRM
@@ -1229,6 +1320,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         f"Saved to: {file_path}"
     )
     await update.message.reply_text(VOICE_ACK[language])
+    await _save_session(update, context, session)
     await prompt_confirmation(update, session)
 
 
@@ -1333,6 +1425,11 @@ async def finalize_application(update: Update, context: ContextTypes.DEFAULT_TYP
     
     session.is_candidate = True
     session.reset_hiring()  # This clears session.answers, but we have a copy
+    
+    # Delete saved session since application is complete
+    if update.effective_user:
+        storage = _get_storage(context)
+        await storage.delete_session(update.effective_user.id)
     
     # Send thank you message with application ID
     await update.message.reply_text(
@@ -1674,6 +1771,7 @@ async def handle_contact_shared(update: Update, context: ContextTypes.DEFAULT_TY
     
     session.answers[question.key] = contact_info
     logger.info(f"Saved contact answer for '{question.key}': '{contact_info}' (Question {session.question_index + 1}/{len(HIRING_QUESTIONS)})")
+    await _save_session(update, context, session)
     await update.message.reply_text(CONTACT_SHARED_ACK[language])
     
     # If in edit mode, go to confirmation instead of next question
@@ -1728,6 +1826,7 @@ async def handle_location_shared(update: Update, context: ContextTypes.DEFAULT_T
     
     session.answers[question.key] = location_info
     logger.info(f"Saved location answer for '{question.key}': '{location_info}' (Question {session.question_index + 1}/{len(HIRING_QUESTIONS)})")
+    await _save_session(update, context, session)
     await update.message.reply_text(LOCATION_SHARED_ACK[language])
     
     # If in edit mode, go to confirmation instead of next question
@@ -1757,7 +1856,7 @@ def main() -> None:
         level=logging.INFO,
     )
     settings = load_settings()
-    storage = DataStorage(settings.applications_file, settings.contact_file)
+    storage = DataStorage(settings.applications_file, settings.contact_file, settings.sessions_dir)
 
     application = Application.builder().token(settings.bot_token).build()
     application.bot_data["storage"] = storage

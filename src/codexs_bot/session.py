@@ -86,6 +86,72 @@ class UserSession:
         self.exit_confirmation_pending = False
         self.exit_confirmation_flow = None
 
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize session to dictionary for persistence."""
+        return {
+            "language": self.language.value if self.language else None,
+            "flow": self.flow.name if self.flow else None,
+            "question_index": self.question_index,
+            "answers": self.answers,
+            "waiting_voice": self.waiting_voice,
+            "voice_file_path": self.voice_file_path,
+            "voice_file_id": self.voice_file_id,
+            "voice_message_id": self.voice_message_id,
+            "user_chat_id": self.user_chat_id,
+            "is_candidate": self.is_candidate,
+            "edit_mode": self.edit_mode,
+            "contact_pending": self.contact_pending,
+            "awaiting_edit_selection": self.awaiting_edit_selection,
+            "voice_skipped": self.voice_skipped,
+            "exit_confirmation_pending": self.exit_confirmation_pending,
+            "exit_confirmation_flow": self.exit_confirmation_flow.name if self.exit_confirmation_flow else None,
+            "awaiting_view_roles": self.awaiting_view_roles,
+            "last_menu_choice": self.last_menu_choice,
+            "ai_reply_count": self.ai_reply_count,
+            "ai_window_start": self.ai_window_start.isoformat() if self.ai_window_start else None,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "UserSession":
+        """Deserialize session from dictionary."""
+        session = cls()
+        if data.get("language"):
+            session.language = Language(data["language"])
+        if data.get("flow"):
+            session.flow = Flow[data["flow"]]
+        session.question_index = data.get("question_index", 0)
+        session.answers = data.get("answers", {})
+        session.waiting_voice = data.get("waiting_voice", False)
+        session.voice_file_path = data.get("voice_file_path")
+        session.voice_file_id = data.get("voice_file_id")
+        session.voice_message_id = data.get("voice_message_id")
+        session.user_chat_id = data.get("user_chat_id")
+        session.is_candidate = data.get("is_candidate", False)
+        session.edit_mode = data.get("edit_mode", False)
+        session.contact_pending = data.get("contact_pending", False)
+        session.awaiting_edit_selection = data.get("awaiting_edit_selection", False)
+        session.voice_skipped = data.get("voice_skipped", False)
+        session.exit_confirmation_pending = data.get("exit_confirmation_pending", False)
+        if data.get("exit_confirmation_flow"):
+            session.exit_confirmation_flow = Flow[data["exit_confirmation_flow"]]
+        session.awaiting_view_roles = data.get("awaiting_view_roles", False)
+        session.last_menu_choice = data.get("last_menu_choice")
+        session.ai_reply_count = data.get("ai_reply_count", 0)
+        if data.get("ai_window_start"):
+            session.ai_window_start = datetime.fromisoformat(data["ai_window_start"])
+        return session
+
+    def has_incomplete_application(self) -> bool:
+        """Check if session has an incomplete application that can be resumed."""
+        return (
+            self.flow == Flow.APPLY
+            and self.question_index > 0
+            and len(self.answers) > 0
+        ) or (
+            self.waiting_voice
+            and len(self.answers) > 0
+        )
+
 
 def get_session(user_data: Dict[str, Any]) -> UserSession:
     session = user_data.get("session")

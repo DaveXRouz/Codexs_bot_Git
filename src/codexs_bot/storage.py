@@ -10,13 +10,15 @@ from .localization import Language
 
 
 class DataStorage:
-    """Handles persistence for applications, contact messages, and metadata."""
+    """Handles persistence for applications, contact messages, sessions, and metadata."""
 
-    def __init__(self, applications_file: Path, contact_file: Path) -> None:
+    def __init__(self, applications_file: Path, contact_file: Path, sessions_dir: Path) -> None:
         self._applications_file = applications_file
         self._contact_file = contact_file
+        self._sessions_dir = sessions_dir
         self._application_lock = asyncio.Lock()
         self._contact_lock = asyncio.Lock()
+        self._sessions_dir.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def _timestamp() -> str:
@@ -66,4 +68,42 @@ class DataStorage:
         with file_path.open("a", encoding="utf-8") as handle:
             json.dump(payload, handle, ensure_ascii=False)
             handle.write("\n")
+
+    def _session_file(self, user_id: int) -> Path:
+        """Get session file path for a user."""
+        return self._sessions_dir / f"session_{user_id}.json"
+
+    async def save_session(self, user_id: int, session_data: Dict[str, Any]) -> None:
+        """Save user session to disk."""
+        session_file = self._session_file(user_id)
+        await asyncio.to_thread(self._write_session, session_file, session_data)
+
+    @staticmethod
+    def _write_session(session_file: Path, session_data: Dict[str, Any]) -> None:
+        """Write session data to file."""
+        session_file.parent.mkdir(parents=True, exist_ok=True)
+        with session_file.open("w", encoding="utf-8") as handle:
+            json.dump(session_data, handle, ensure_ascii=False, indent=2)
+
+    async def load_session(self, user_id: int) -> Optional[Dict[str, Any]]:
+        """Load user session from disk."""
+        session_file = self._session_file(user_id)
+        if not session_file.exists():
+            return None
+        try:
+            return await asyncio.to_thread(self._read_session, session_file)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _read_session(session_file: Path) -> Dict[str, Any]:
+        """Read session data from file."""
+        with session_file.open("r", encoding="utf-8") as handle:
+            return json.load(handle)
+
+    async def delete_session(self, user_id: int) -> None:
+        """Delete user session file."""
+        session_file = self._session_file(user_id)
+        if session_file.exists():
+            await asyncio.to_thread(session_file.unlink)
 

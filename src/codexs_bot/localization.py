@@ -36,6 +36,29 @@ WELCOME_MESSAGE = {
     ),
 }
 
+RESUME_PROMPT = {
+    Language.EN: (
+        "📋 <b>Incomplete Application Found</b>\n\n"
+        "You have an incomplete application with {progress} questions answered.\n\n"
+        "Would you like to resume where you left off?"
+    ),
+    Language.FA: (
+        "📋 <b>درخواست ناتمام یافت شد</b>\n\n"
+        "شما یک درخواست ناتمام با {progress} سؤال پاسخ داده شده دارید.\n\n"
+        "آیا می‌خواهید از جایی که متوقف شدید ادامه دهید؟"
+    ),
+}
+
+RESUME_YES = {
+    Language.EN: "✅ Yes, resume application",
+    Language.FA: "✅ بله، ادامه درخواست",
+}
+
+RESUME_NO = {
+    Language.EN: "🔄 No, start fresh",
+    Language.FA: "🔄 خیر، شروع جدید",
+}
+
 LANDING_CARD_CAPTION = (
     "<b>Codexs · Global automation studio</b>\n"
     "Apply for remote roles, explore AI launches, and reach our team across time zones.\n\n"

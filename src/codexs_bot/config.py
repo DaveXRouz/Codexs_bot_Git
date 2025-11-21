@@ -18,6 +18,7 @@ class Settings:
     applications_file: Path
     contact_file: Path
     voice_dir: Path
+    sessions_dir: Path
     application_webhook_url: Optional[str]
     application_webhook_token: Optional[str]
     contact_webhook_url: Optional[str]
@@ -66,6 +67,9 @@ def load_settings() -> Settings:
     voice_dir = data_dir / "voice_samples"
     voice_dir.mkdir(parents=True, exist_ok=True)
 
+    sessions_dir = data_dir / "sessions"
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+
     media_dir = project_root / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
 
@@ -84,6 +88,7 @@ def load_settings() -> Settings:
         applications_file=data_dir / "applications.jsonl",
         contact_file=data_dir / "contact_messages.jsonl",
         voice_dir=voice_dir,
+        sessions_dir=sessions_dir,
         application_webhook_url=application_webhook_url,
         application_webhook_token=application_webhook_token,
         contact_webhook_url=contact_webhook_url,
