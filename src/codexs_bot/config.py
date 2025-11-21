@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -27,7 +30,17 @@ def load_settings() -> Settings:
     """Load environment configuration and ensure data directories exist."""
     load_dotenv()
 
-    token = os.getenv("BOT_TOKEN")
+    token_raw = os.getenv("BOT_TOKEN")
+    token = ""
+    if token_raw:
+        sanitized_token = "".join(ch for ch in token_raw if ch.isprintable()).strip()
+        if sanitized_token != token_raw:
+            logger.warning(
+                "BOT_TOKEN contained leading/trailing or non-printable characters. "
+                "Sanitizing value before use."
+            )
+        token = sanitized_token
+
     if not token:
         raise RuntimeError("BOT_TOKEN is missing. Set it in your environment or .env file.")
 
