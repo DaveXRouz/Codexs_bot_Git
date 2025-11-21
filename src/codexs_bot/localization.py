@@ -26,14 +26,21 @@ LANGUAGE_PROMPT = {
 
 WELCOME_MESSAGE = {
     Language.EN: (
-        "Welcome to <b>Codexs.ai</b> — global automation studio.\n"
+        "Welcome to <b>Codexs</b> — global automation studio.\n"
         "Tell me what you'd like to do and I'll guide you."
     ),
     Language.FA: (
-        "به <b>Codexs.ai</b> خوش آمدید — استودیوی جهانی اتوماسیون.\n"
+        "به <b>Codexs</b> خوش آمدید — استودیوی جهانی اتوماسیون.\n"
         "بفرمایید به دنبال چه هستید تا راهنمایی‌تان کنم."
     ),
 }
+
+LANDING_CARD_CAPTION = (
+    "<b>Codexs · Global automation studio</b>\n"
+    "Apply for remote roles, explore AI launches, and reach our team across time zones.\n\n"
+    "<b>Codexs · استودیوی جهانی اتوماسیون</b>\n"
+    "برای موقعیت‌های دورکار اقدام کنید، پروژه‌های هوشمند را ببینید و با تیم در تماس باشید."
+)
 
 BACK_TO_MENU = {
     Language.EN: "⬅️ Back to main menu",
@@ -104,6 +111,25 @@ MENU_LABELS: Dict[str, Dict[Language, str]] = {
     "switch": {
         Language.EN: "🔁 Switch to فارسی",
         Language.FA: "🔁 تغییر به English",
+    },
+}
+
+MENU_TOPIC_TITLES = {
+    "apply": {
+        Language.EN: "applications and open roles",
+        Language.FA: "فرم درخواست و موقعیت‌های شغلی",
+    },
+    "about": {
+        Language.EN: "Codexs profile",
+        Language.FA: "معرفی Codexs",
+    },
+    "updates": {
+        Language.EN: "news and launches",
+        Language.FA: "خبرها و لانچ‌ها",
+    },
+    "contact": {
+        Language.EN: "contact and support",
+        Language.FA: "تماس و پشتیبانی",
     },
 }
 
@@ -274,8 +300,8 @@ HIRING_QUESTIONS: List[Question] = [
     Question(
         key="motivation",
         prompts={
-            Language.EN: "<b>1️⃣1️⃣ Why Codexs.ai?</b>\n<i>What excites you about joining our team? What makes this a good fit?</i>",
-            Language.FA: "<b>۱۱️⃣ چرا Codexs.ai؟</b>\n<i>چه چیزی در مورد پیوستن به تیم ما شما را هیجان‌زده می‌کند؟ چرا این همکاری مناسب است؟</i>",
+            Language.EN: "<b>1️⃣1️⃣ Why Codexs?</b>\n<i>What excites you about joining our team? What makes this a strong fit?</i>",
+            Language.FA: "<b>۱۱️⃣ چرا Codexs؟</b>\n<i>چه چیزی در مورد پیوستن به تیم ما شما را هیجان‌زده می‌کند؟ چرا این همکاری مناسب است؟</i>",
         },
         summary_labels={
             Language.EN: "Motivation",
@@ -298,14 +324,14 @@ HIRING_QUESTIONS: List[Question] = [
 
 HIRING_INTRO = {
     Language.EN: (
-        "<b>💼 Codexs.ai Application</b>\n\n"
+        "<b>💼 Codexs Application</b>\n\n"
         "This form has <b>12 short questions</b> (~3 minutes)\n"
         "Plus a mandatory <b>English voice test</b>\n\n"
         "🔒 Your answers stay confidential with the Codexs hiring team\n"
         "✅ You can edit before final submission"
     ),
     Language.FA: (
-        "<b>💼 فرم درخواست Codexs.ai</b>\n\n"
+        "<b>💼 فرم درخواست Codexs</b>\n\n"
         "این فرم <b>۱۲ سؤال کوتاه</b> دارد (حدود ۳ دقیقه)\n"
         "به اضافه <b>تست صوتی انگلیسی اجباری</b>\n\n"
         "🔒 پاسخ‌ها نزد تیم استخدام Codexs محرمانه می‌ماند\n"
@@ -351,19 +377,19 @@ THANK_YOU = {
     Language.EN: (
         "All set! Your application has been submitted.\n\n"
         "📋 <b>Application ID:</b> {app_id}\n\n"
-        "The Codexs.ai hiring team will review your profile and reach out via email or Telegram within <b>1-2 business days</b>.\n\n"
+        "The Codexs hiring team will review your profile and reach out via email or Telegram within <b>1-2 business days</b>.\n\n"
         "You can now return to the main menu to explore other sections."
     ),
     Language.FA: (
         "همه چیز ثبت شد! درخواست شما ارسال شد.\n\n"
         "📋 <b>شناسه درخواست:</b> {app_id}\n\n"
-        "تیم استخدام Codexs.ai پروفایل شما را بررسی می‌کند و ظرف <b>۱ تا ۲ روز کاری</b> از طریق ایمیل یا تلگرام تماس می‌گیرد.\n\n"
+        "تیم استخدام Codexs پروفایل شما را بررسی می‌کند و ظرف <b>۱ تا ۲ روز کاری</b> از طریق ایمیل یا تلگرام تماس می‌گیرد.\n\n"
         "اکنون می‌توانید به منوی اصلی برگردید و سایر بخش‌ها را بررسی کنید."
     ),
 }
 
 CONFIRMATION_IMAGE_CAPTION = {
-    Language.EN: "Thank you for applying to Codexs.ai. We'll be in touch soon.",
+    Language.EN: "Thank you for applying to Codexs. We'll be in touch soon.",
     Language.FA: "از درخواست شما متشکریم. به زودی با شما تماس خواهیم گرفت.",
 }
 
@@ -406,12 +432,12 @@ RERECORD_VOICE_PROMPT = {
 
 ABOUT_TEXT = {
     Language.EN: (
-        "**Codexs.ai — Global Automation Studio**\n"
+        "**Codexs — Global Automation Studio**\n"
         "We build precision systems at the intersection of AI, software, data, and operations. "
         "Remote-first. Tesla-level craft. Always bilingual."
     ),
     Language.FA: (
-        "**Codexs.ai — استودیوی جهانی اتوماسیون**\n"
+        "**Codexs — استودیوی جهانی اتوماسیون**\n"
         "در تقاطع هوش مصنوعی، نرم‌افزار، داده و عملیات تجربه‌های دقیق می‌سازیم. "
         "کاملاً ریموت، با کیفیت سطح تسلا و همیشه دو‌زبانه."
     ),
@@ -422,7 +448,7 @@ ABOUT_SECTIONS = {
         {
             "title": "Mission Control",
             "body": (
-                "Codexs.ai builds distributed automation layers for ambitious product, data, and ops teams.\n"
+                "Codexs builds distributed automation layers for ambitious product, data, and ops teams.\n"
                 "• Hybrid squads of AI engineers, product thinkers, and operators\n"
                 "• 4–6 week launch windows with live telemetry dashboards\n"
                 "• Preferred stack: PyTorch, LangChain, Temporal, Supabase, Svelte"
@@ -449,7 +475,7 @@ ABOUT_SECTIONS = {
         {
             "title": "اتاق فرمان",
             "body": (
-                "Codexs.ai لایه‌های اتوماسیون توزیع‌شده برای تیم‌های محصول، داده و عملیات می‌سازد.\n"
+                "Codexs لایه‌های اتوماسیون توزیع‌شده برای تیم‌های محصول، داده و عملیات می‌سازد.\n"
                 "• اسکادران‌های ترکیبی شامل مهندسان هوش مصنوعی، طراحان محصول و اپراتورها\n"
                 "• پنجره‌های راه‌اندازی ۴ تا ۶ هفته‌ای همراه با داشبورد تله‌متری\n"
                 "• استک محبوب: PyTorch، LangChain، Temporal، Supabase، Svelte"
@@ -620,8 +646,13 @@ CONTACT_DECISION_REMINDER = {
 }
 
 FALLBACK_MESSAGE = {
-    Language.EN: "I didn't catch that. Please use the menu buttons below, or type /menu to return to the main menu.",
-    Language.FA: "متوجه نشدم. لطفاً از دکمه‌های منو استفاده کنید یا دستور /menu را برای بازگشت به منوی اصلی بفرستید.",
+    Language.EN: "I couldn’t map that request. Use the buttons below or type /commands for shortcuts.",
+    Language.FA: "نتوانستم درخواست شما را تطبیق دهم. از دکمه‌ها استفاده کنید یا ‎/commands‎ را برای میانبرها بفرستید.",
+}
+
+SMART_FALLBACK_HINT = {
+    Language.EN: "It sounds like you need <b>{topic}</b>. I’ll open that section for you.",
+    Language.FA: "به نظر می‌رسد دنبال <b>{topic}</b> هستید. همان بخش را برایتان باز می‌کنم.",
 }
 
 HELP_TEXT_APPLY = {
@@ -736,7 +767,7 @@ HELP_TEXT = {
         "• Learn about the studio\n"
         "• Read updates & news\n"
         "• Send a contact message\n\n"
-        "Commands: /start · /menu · /help"
+        "Commands: /start · /menu · /help · /commands"
     ),
     Language.FA: (
         "می‌توانم کمک کنم:\n"
@@ -744,7 +775,24 @@ HELP_TEXT = {
         "• آشنایی با استودیو\n"
         "• دیدن خبرها و به‌روزرسانی‌ها\n"
         "• ارسال پیام برای تیم\n\n"
-        "دستورات: ‎/start · ‎/menu · ‎/help"
+        "دستورات: ‎/start · ‎/menu · ‎/help · ‎/commands"
+    ),
+}
+
+COMMANDS_TEXT = {
+    Language.EN: (
+        "<b>Command palette</b>\n"
+        "/start – Restart and choose a language\n"
+        "/menu – Jump back to the main menu\n"
+        "/help – Context-aware tips\n"
+        "/commands – Show this list"
+    ),
+    Language.FA: (
+        "<b>فهرست دستورات</b>\n"
+        "/start – شروع دوباره و انتخاب زبان\n"
+        "/menu – بازگشت به منوی اصلی\n"
+        "/help – راهنمای متناسب با وضعیت شما\n"
+        "/commands – نمایش همین فهرست"
     ),
 }
 

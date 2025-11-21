@@ -44,7 +44,7 @@
 
 In GitHub Desktop:
 1. You'll see all the files ready to commit
-2. Write a commit message: `"Initial commit: Codexs.ai Telegram Bot"`
+2. Write a commit message: `"Initial commit: Codexs Telegram Bot"`
 3. Click **"Commit to main"**
 
 ### Step 4: Push to GitHub

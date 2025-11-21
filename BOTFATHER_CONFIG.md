@@ -1,6 +1,6 @@
 # BotFather Configuration Guide
 
-This document provides the exact text to use in BotFather for your Codexs.ai bot.
+This document provides the exact text to use in BotFather for your Codexs bot.
 
 ---
 
@@ -10,12 +10,12 @@ This document provides the exact text to use in BotFather for your Codexs.ai bot
 
 **Text:**
 ```
-Codexs.ai Assistant
+Codexs Assistant
 ```
 
 **Alternative (if you prefer shorter):**
 ```
-Codexs Assistant
+Codexs
 ```
 
 ---
@@ -26,12 +26,12 @@ Codexs Assistant
 
 **Text:**
 ```
-AI-powered gateway to Codexs.ai – apply for remote roles, explore projects, and contact our team.
+AI-powered gateway to Codexs – apply for remote roles, explore projects, and contact our team.
 ```
 
 **Alternative (more detailed):**
 ```
-Codexs.ai Assistant – Your fast lane into our global digital studio. Apply for remote roles, discover AI-driven projects, and connect with our team.
+Codexs Assistant – Your fast lane into our global digital studio. Apply for remote roles, discover AI-driven projects, and connect with our team.
 ```
 
 ---
@@ -42,11 +42,11 @@ Codexs.ai Assistant – Your fast lane into our global digital studio. Apply for
 
 **Text:**
 ```
-Meet the Codexs.ai Assistant, your fast lane into our global digital studio.
+Meet the Codexs Assistant, your fast lane into our global digital studio.
 
 • Apply for remote roles in tech, design & operations
 • Discover how we build AI-driven products and systems
-• Get news and project updates from the Codexs.ai team
+• Get news and project updates from the Codexs team
 • Reach support when you need a real human
 
 Bilingual support: English & Farsi
@@ -54,7 +54,7 @@ Bilingual support: English & Farsi
 
 **Alternative (shorter version):**
 ```
-Welcome to Codexs.ai – global automation studio.
+Welcome to Codexs – global automation studio.
 
 • 💼 Apply for remote roles
 • 🏢 Learn about our projects
@@ -71,8 +71,8 @@ Bilingual: English & Farsi
 **Field:** "Set Welcome Picture" button
 
 **Recommendation:**
-- Use the Codexs.ai logo
-- Or a clean, minimal banner with "Codexs.ai" branding
+- Use the Codexs logo
+- Or a clean, minimal banner with "Codexs" branding
 - Dimensions: 640x360px (16:9 ratio) works well
 - Keep it simple and professional
 
@@ -83,12 +83,12 @@ Bilingual: English & Farsi
 ## 📋 Complete BotFather Setup Checklist
 
 ### Step 1: Basic Info
-- [ ] **Bot Name:** `Codexs.ai Assistant`
-- [ ] **Description:** `AI-powered gateway to Codexs.ai – apply for remote roles, explore projects, and contact our team.`
+- [ ] **Bot Name:** `Codexs Assistant`
+- [ ] **Description:** `AI-powered gateway to Codexs – apply for remote roles, explore projects, and contact our team.`
 
 ### Step 2: Welcome Message
 - [ ] **"What can this bot do?"** field: Copy the welcome message text above
-- [ ] **Welcome Picture:** (Optional) Upload Codexs.ai logo/banner
+- [ ] **Welcome Picture:** (Optional) Upload Codexs logo/banner
 
 ### Step 3: Bot Settings
 - [ ] **Allow Groups:** ✅ Enabled (so bot can post in your group)
@@ -102,6 +102,7 @@ Set up these commands in BotFather:
 start - Start the bot and select language
 menu - Return to main menu
 help - Show help information
+commands - List available shortcuts
 ```
 
 ---
@@ -111,7 +112,7 @@ help - Show help information
 In BotFather, use `/setcommands` and paste this **exact format**:
 
 ```
-start - Start the Codexs.ai Assistant and select your language
+start - Start the Codexs Assistant and select your language
 menu - Return to the main menu
 help - Get help and see what I can do for you
 ```

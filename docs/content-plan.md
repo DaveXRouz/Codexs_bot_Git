@@ -5,7 +5,7 @@ This document translates the audit findings into concrete copy, translation, and
 ## 1. Entry & Language Selection
 | Context | English Copy | Farsi Copy |
 | --- | --- | --- |
-| Welcome (post-language choice) | “Welcome to **Codexs.ai**. Select what you’d like to do.” | «به **Codexs.ai** خوش آمدید. لطفاً مقصد خود را انتخاب کنید.» |
+| Welcome (post-language choice) | “Welcome to **Codexs**. Select what you’d like to do.” | «به **Codexs** خوش آمدید. لطفاً مقصد خود را انتخاب کنید.» |
 | Language prompt (pre-choice) | “Tap a language to continue ↓” | «برای ادامه زبان را انتخاب کنید ↓» |
 | Main menu prompt | “Main menu · Pick a focus area.” | «منوی اصلی · یکی از بخش‌ها را انتخاب کنید.» |
 | Menu helper | “Use the blue buttons below. You can always tap ⬅️ Back to main menu.” | «با دکمه‌های آبی زیر کار کنید و هر زمان خواستید ⬅️ بازگشت به منوی اصلی را بزنید.» |
@@ -22,7 +22,7 @@ This document translates the audit findings into concrete copy, translation, and
 8. `Portfolio / case link (or short note)?` → «لینک نمونه‌کار یا توضیح کوتاه؟»
 9. `Earliest start date?` → «زودترین تاریخ شروع؟»
 10. `Preferred working hours or overlap window?` → «ساعات کاری ترجیحی یا بازه هم‌پوشانی؟»
-11. `Why Codexs.ai? What gets you excited?` → «چرا Codexs.ai؟ چه چیزی شما را جذب می‌کند؟»
+11. `Why Codexs? What gets you excited?` → «چرا Codexs؟ چه چیزی شما را جذب می‌کند؟»
 12. Optional salary → instruct per language: `Type "Skip" to skip` vs «کلمه «رد کردن» را بنویسید اگر نمی‌خواهید بگویید.»
 
 ### Instructional Text
@@ -44,7 +44,7 @@ This document translates the audit findings into concrete copy, translation, and
 
 ## 5. About / Updates Storytelling
 - Instead of repeating `ABOUT_TEXT`, show:
-  1. “Codexs.ai · Global automation studio” (brief).
+  1. “Codexs · Global automation studio” (brief).
   2. Cards from `ABOUT_SECTIONS`.
   3. CTA: `🔗 View open roles` and `⬅️ Back to main menu`.
 - Farsi translations already drafted; refine for tone.

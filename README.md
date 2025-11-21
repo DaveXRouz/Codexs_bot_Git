@@ -1,6 +1,6 @@
-# Codexs.ai Telegram Bot 🤖
+# Codexs Telegram Bot 🤖
 
-A professional, bilingual (English/Farsi) Telegram bot for Codexs.ai that handles job applications, company information, and contact requests with a premium user experience.
+A professional, bilingual (English/Farsi) Telegram bot for Codexs that handles job applications, company information, and contact requests with a premium user experience.
 
 ## ✨ Features
 
@@ -122,7 +122,7 @@ pytest --cov=src/codexs_bot --cov-report=html
 
 ## 📝 License
 
-Private - Codexs.ai
+Private - Codexs
 
 ## 🤝 Support
 

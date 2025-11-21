@@ -20,7 +20,7 @@ codexs_bot/
 
 **When Used:** 
 - Shown immediately after user selects their language (English or Farsi)
-- First visual impression of Codexs.ai brand
+- First visual impression of Codexs brand
 - Appears before the main menu
 
 **Format:** PNG or JPG
@@ -36,7 +36,7 @@ codexs_bot/
 
 **When Used:** 
 - Shown after user successfully submits a job application
-- Appears with caption: "Thank you for applying to Codexs.ai. We'll be in touch soon."
+- Appears with caption: "Thank you for applying to Codexs. We'll be in touch soon."
 
 **Format:** PNG or JPG
 **Recommended Size:** 1200x400px or similar (will be scaled by Telegram)

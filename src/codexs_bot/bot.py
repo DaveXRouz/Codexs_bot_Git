@@ -28,11 +28,13 @@ from .localization import (
     ABOUT_TEXT,
     BACK_TO_MENU,
     BILINGUAL_WELCOME,
+    COMMANDS_TEXT,
     CONTACT_SHARED_ACK,
     CONTACT_SHARED_NOTIFICATION,
     EXIT_CONFIRM_CANCEL,
     EXIT_CONFIRM_DONE,
     EXIT_CONFIRM_PROMPT,
+    FALLBACK_MESSAGE,
     HELP_TEXT,
     CONTACT_DECISION_REMINDER,
     CONTACT_INFO,
@@ -52,10 +54,10 @@ from .localization import (
     ERROR_TEXT_TOO_LONG,
     HELP_TEXT_APPLY,
     HELP_TEXT_VOICE,
-    FALLBACK_MESSAGE,
     HIRING_INTRO,
     HIRING_QUESTIONS,
     INVALID_EDIT,
+    LANDING_CARD_CAPTION,
     LANGUAGE_PROMPT,
     LANGUAGE_REMINDER,
     Language,
@@ -63,10 +65,12 @@ from .localization import (
     MAIN_MENU_PROMPT,
     MENU_HELPER,
     MENU_LABELS,
+    MENU_TOPIC_TITLES,
     MISSING_ANSWER,
     SHARE_CONTACT_BUTTON,
     SHARE_LOCATION_BUTTON,
     SKIPPED_TEXT,
+    SMART_FALLBACK_HINT,
     SUMMARY_HEADER,
     THANK_YOU,
     UPDATES,
@@ -82,7 +86,6 @@ from .localization import (
     VOICE_STATUS_SKIPPED,
     VOICE_STATUS_RECEIVED,
     VOICE_WAITING_REMINDER,
-    BACK_TO_MENU,
     WELCOME_MESSAGE,
     QUESTION_PROGRESS,
     RATE_LIMIT_MESSAGE,
@@ -113,6 +116,27 @@ _rate_limit_store: Dict[int, List[datetime]] = defaultdict(list)
 RATE_LIMIT_MAX_REQUESTS = 20  # Max requests per minute
 RATE_LIMIT_WINDOW = timedelta(minutes=1)
 
+_MENU_KEYWORDS = {
+    "apply": {
+        Language.EN: ("apply", "application", "job", "career", "role", "position", "hire"),
+        Language.FA: ("درخواست", "شغل", "کار", "استخدام", "فرصت"),
+    },
+    "about": {
+        Language.EN: ("about", "studio", "company", "codexs"),
+        Language.FA: ("درباره", "استودیو", "codexs", "شرکت"),
+    },
+    "updates": {
+        Language.EN: ("news", "update", "launch", "what's new", "latest"),
+        Language.FA: ("خبر", "آپدیت", "به‌روزرسانی", "لانچ", "جدید"),
+    },
+    "contact": {
+        Language.EN: ("contact", "support", "help", "reach", "message"),
+        Language.FA: ("تماس", "پشتیبانی", "کمک", "پیام"),
+    },
+}
+
+_VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm"}
+
 
 def _check_rate_limit(user_id: int) -> bool:
     """Check if user has exceeded rate limit. Returns True if allowed, False if rate limited."""
@@ -138,6 +162,29 @@ def _format_hiring_intro(language: Language) -> str:
     
     # Clean, minimal format
     return intro_text
+
+
+def _normalize_for_intent(text: str) -> str:
+    normalized = re.sub(r"[^a-zA-Z0-9\u0600-\u06FF\s]", " ", text)
+    return normalized.lower()
+
+
+def _match_menu_button(text: str, language: Language) -> Optional[str]:
+    for key, labels in MENU_LABELS.items():
+        if text == labels[language]:
+            return key
+    return None
+
+
+def _infer_menu_choice(text: str, language: Language) -> Optional[str]:
+    normalized = _normalize_for_intent(text)
+    for key, language_map in _MENU_KEYWORDS.items():
+        if language not in language_map:
+            continue
+        for keyword in language_map[language]:
+            if keyword and keyword in normalized:
+                return key
+    return None
 
 
 def _format_question_box(progress: str, question_text: str, language: Language) -> str:
@@ -206,6 +253,52 @@ async def _send_photo_with_fallback(message, photo_url: Optional[str], caption: 
     await message.reply_text(caption, parse_mode="HTML")
 
 
+async def _send_landing_card(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return
+
+    settings = _get_settings(context)
+    if not settings.enable_media:
+        await update.message.reply_text(LANDING_CARD_CAPTION, parse_mode="HTML")
+        return
+
+    hero_path: Optional[Path] = None
+    for filename in [
+        "landing-card.mp4",
+        "landing-card.mov",
+        "landing-card.webm",
+        "landing-card.m4v",
+        "landing-card.jpg",
+        "landing-card.jpeg",
+        "landing-card.png",
+    ]:
+        candidate = settings.media_dir / filename
+        if candidate.exists():
+            hero_path = candidate
+            break
+
+    if hero_path:
+        try:
+            with open(hero_path, "rb") as media_file:
+                if hero_path.suffix.lower() in _VIDEO_EXTENSIONS:
+                    await update.message.reply_video(
+                        video=media_file,
+                        caption=LANDING_CARD_CAPTION,
+                        parse_mode="HTML",
+                    )
+                else:
+                    await update.message.reply_photo(
+                        photo=media_file,
+                        caption=LANDING_CARD_CAPTION,
+                        parse_mode="HTML",
+                    )
+                return
+        except Exception as exc:
+            logger.warning("Failed to send landing media: %s", exc)
+
+    await update.message.reply_text(LANDING_CARD_CAPTION, parse_mode="HTML")
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message:
         return
@@ -214,6 +307,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     session.language = None
     session.flow = Flow.IDLE
     session.contact_pending = False
+    await _send_landing_card(update, context)
     await update.message.reply_text(
         f"{BILINGUAL_WELCOME}\n\n"
         f"🇬🇧 {LANGUAGE_PROMPT[Language.EN]}\n"
@@ -303,6 +397,45 @@ def _get_application_notifier(context: ContextTypes.DEFAULT_TYPE) -> WebhookNoti
 
 def _get_contact_notifier(context: ContextTypes.DEFAULT_TYPE) -> WebhookNotifier:
     return context.application.bot_data["contact_notifier"]
+
+
+async def _open_menu_section(
+    key: str,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+    language: Language,
+) -> None:
+    if not update.message:
+        return
+
+    if key == "apply":
+        session.start_hiring()
+        intro_formatted = _format_hiring_intro(language)
+        await update.message.reply_text(
+            intro_formatted,
+            reply_markup=ReplyKeyboardMarkup(back_keyboard(language), resize_keyboard=True),
+            parse_mode="HTML",
+        )
+        await ask_current_question(update, session)
+        return
+
+    if key == "about":
+        await share_about_story(update, context, session, language)
+        return
+
+    if key == "updates":
+        await share_updates(update, context, language)
+        return
+
+    if key == "contact":
+        session.flow = Flow.CONTACT_MESSAGE
+        session.contact_pending = True
+        await update.message.reply_text(
+            CONTACT_INFO[language],
+            reply_markup=ReplyKeyboardMarkup(yes_no_keyboard(language), resize_keyboard=True),
+        )
+        return
 
 
 async def handle_exit_confirmation(update: Update, session: UserSession, text: str) -> None:
@@ -542,39 +675,29 @@ async def handle_main_menu_choice(
     language = session.language or Language.EN
     session.contact_pending = False
     session.flow = Flow.IDLE
-    if text == MENU_LABELS["apply"][language]:
-        session.start_hiring()
-        # Format hiring intro with visual design
-        intro_formatted = _format_hiring_intro(language)
-        await update.message.reply_text(
-            intro_formatted,
-            reply_markup=ReplyKeyboardMarkup(back_keyboard(language), resize_keyboard=True),
-            parse_mode="HTML",
-        )
-        await ask_current_question(update, session)
+    matched_key = _match_menu_button(text, language)
+    if matched_key in {"apply", "about", "updates", "contact"}:
+        await _open_menu_section(matched_key, update, context, session, language)
         return
-    if text == MENU_LABELS["about"][language]:
-        await share_about_story(update, context, session, language)
-        return
-    if text == MENU_LABELS["updates"][language]:
-        await share_updates(update, context, language)
-        return
-    if text == MENU_LABELS["contact"][language]:
-        session.flow = Flow.CONTACT_MESSAGE
-        session.contact_pending = True
-        await update.message.reply_text(
-            CONTACT_INFO[language],
-            reply_markup=ReplyKeyboardMarkup(yes_no_keyboard(language), resize_keyboard=True),
-        )
-        return
-    if text == MENU_LABELS["switch"][language]:
+    if matched_key == "switch":
         session.language = switch_language(language)
         await show_main_menu(update, session)
+        return
+
+    inferred_key = _infer_menu_choice(text, language)
+    if inferred_key:
+        topic = MENU_TOPIC_TITLES[inferred_key][language]
+        await update.message.reply_text(
+            SMART_FALLBACK_HINT[language].format(topic=topic),
+            parse_mode="HTML",
+        )
+        await _open_menu_section(inferred_key, update, context, session, language)
         return
 
     await update.message.reply_text(
         FALLBACK_MESSAGE[language],
         reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        parse_mode="HTML",
     )
 
 
@@ -1225,6 +1348,14 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await update.message.reply_text(help_text, parse_mode="HTML")
 
 
+async def handle_commands(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not update.message:
+        return
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    await update.message.reply_text(COMMANDS_TEXT[language], parse_mode="HTML")
+
+
 async def handle_contact_shared(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle when user shares their Telegram contact."""
     if not update.message or not update.message.contact:
@@ -1350,6 +1481,7 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("help", handle_help))
+    application.add_handler(CommandHandler("commands", handle_commands))
     application.add_handler(MessageHandler(filters.CONTACT, handle_contact_shared))
     application.add_handler(MessageHandler(filters.LOCATION, handle_location_shared))
     application.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))

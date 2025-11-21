@@ -3,7 +3,7 @@
 ## ✅ Issues Fixed
 
 ### 1. **Menu Button Text Fixed**
-**Before:** "🏢 About Codexs.ai"  
+**Before:** "🏢 About Codexs"  
 **After:** "🏢 About Codex"
 
 **Location:** `localization.py` - MENU_LABELS["about"]
@@ -102,7 +102,7 @@ _send_photo_with_fallback(message, photo_url, caption, photo_path)
 ## 🧪 Testing Checklist
 
 1. **About Flow:**
-   - [ ] Click "About Codex" (not "About Codexs.ai")
+   - [ ] Click "About Codex" (not "About Codexs")
    - [ ] See 3 sections (Mission Control, Operating Principles, Proof of Work)
    - [ ] See "Would you like to view open roles?" with buttons
    - [ ] Click "Yes" → Should start apply flow
@@ -123,7 +123,7 @@ _send_photo_with_fallback(message, photo_url, caption, photo_path)
 ## 📝 Files Modified
 
 1. `localization.py`:
-   - Changed "About Codexs.ai" → "About Codex"
+   - Changed "About Codexs" → "About Codex"
    - Added `VIEW_ROLES_YES` and `VIEW_ROLES_NO` buttons
 
 2. `bot.py`:

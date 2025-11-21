@@ -1,4 +1,4 @@
-# Codexs.ai Telegram Bot - Media & Content Requirements
+# Codexs Telegram Bot - Media & Content Requirements
 
 This document lists all photos, banners, and content assets needed for the bot.
 
@@ -18,7 +18,7 @@ This document lists all photos, banners, and content assets needed for the bot.
 **File Name:** `about-hero.jpg` or `about-hero.png`
 
 **Where Used:** 
-- Shown at the end of the "About Codexs.ai" section
+- Shown at the end of the "About Codexs" section
 - Displayed after all 3 text sections (Mission Control, Operating Principles, Proof of Work)
 
 **Specifications:**
@@ -28,19 +28,19 @@ This document lists all photos, banners, and content assets needed for the bot.
 - **Style:** Professional, minimal, futuristic
 
 **Content Description:**
-- Should represent: **"Codexs.ai launch room — async squads syncing telemetry before hand-off"**
+- Should represent: **"Codexs launch room — async squads syncing telemetry before hand-off"**
 - Visual concept: Modern workspace, remote team collaboration, tech/automation theme
 - Mood: Clean, minimal, Tesla/SpaceX aesthetic
-- Colors: Match Codexs.ai brand colors (if you have them)
+- Colors: Match Codexs brand colors (if you have them)
 - Elements to include:
   - Team collaboration (can be abstract/silhouette)
   - Tech/automation elements (dashboards, code, data visualization)
   - Remote work vibe (multiple screens, global team feel)
   - Professional, futuristic atmosphere
 
-**Caption Text (EN):** "Codexs.ai launch room — async squads syncing telemetry before hand-off."
+**Caption Text (EN):** "Codexs launch room — async squads syncing telemetry before hand-off."
 
-**Caption Text (FA):** "اتاق لانچ Codexs.ai — هماهنگی تله‌متری تیم‌های غیرهمزمان پیش از تحویل."
+**Caption Text (FA):** "اتاق لانچ Codexs — هماهنگی تله‌متری تیم‌های غیرهمزمان پیش از تحویل."
 
 ---
 
@@ -142,8 +142,8 @@ This document lists all photos, banners, and content assets needed for the bot.
 - **File Size:** Under 1.5MB
 
 **Content Description:**
-- Codexs.ai logo + tagline
-- "Welcome to Codexs.ai" message
+- Codexs logo + tagline
+- "Welcome to Codexs" message
 - Clean, minimal design
 - Brand colors
 
@@ -153,7 +153,7 @@ This document lists all photos, banners, and content assets needed for the bot.
 
 ### Brand Aesthetic
 - **Style:** Tesla/SpaceX-level, minimal, futuristic, professional
-- **Colors:** Use Codexs.ai brand colors (if available), or stick to:
+- **Colors:** Use Codexs brand colors (if available), or stick to:
   - Dark backgrounds with light accents
   - Or light backgrounds with dark accents
   - Avoid overly bright/saturated colors

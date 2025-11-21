@@ -1,4 +1,5 @@
-start - Start the Codexs.ai Assistant and select your language
+start - Start the Codexs Assistant and select your language
 menu - Return to the main menu
 help - Get help and see what I can do for you
+commands - Show the list of commands and shortcuts
 

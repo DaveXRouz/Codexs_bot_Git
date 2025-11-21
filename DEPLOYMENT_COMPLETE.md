@@ -227,7 +227,7 @@ All deployment files are ready:
 
 **Status:** ✅ **FULLY DEPLOYED**
 
-The Codexs.ai Telegram Bot is:
+The Codexs Telegram Bot is:
 - ✅ Running locally
 - ✅ Fully configured
 - ✅ Production ready
