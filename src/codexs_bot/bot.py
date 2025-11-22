@@ -1699,7 +1699,10 @@ async def announce_group_submission(
 ) -> None:
     chat_id = context.application.bot_data.get("group_chat_id")
     if not chat_id:
+        logger.warning(f"GROUP_CHAT_ID not configured. Application {application_id} saved but not sent to group.")
         return
+    
+    logger.info(f"Attempting to send application {application_id} to group chat {chat_id}")
 
     def value(key: str) -> str:
         val = answers.get(key)
@@ -1773,11 +1776,14 @@ async def announce_group_submission(
 
     try:
         await context.bot.send_message(chat_id=chat_id, text=message, parse_mode="HTML")
-        logger.info(f"Application summary sent to group {chat_id}")
+        logger.info(f"✅ Application summary sent to group {chat_id} for application {application_id}")
     except TelegramError as exc:
-        logger.error(f"Failed to send application summary to group {chat_id}: {exc}", exc_info=True)
+        logger.error(f"❌ Failed to send application summary to group {chat_id}: {exc}", exc_info=True)
+        logger.error(f"Application {application_id} was saved but group notification failed!")
         # Don't fail the application submission - data is already saved
         # Log error but continue with voice forwarding attempt
+    except Exception as exc:
+        logger.error(f"❌ Unexpected error sending application to group: {exc}", exc_info=True)
     
     # Forward the voice message if available (regardless of message send success/failure)
     if voice_message_id and user_chat_id:
@@ -2219,6 +2225,47 @@ async def handle_admin_debug(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
 
+async def handle_admin_test_group(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Test sending a message to the group."""
+    if not await _require_admin(update, context) or not update.message:
+        return
+    
+    chat_id = context.application.bot_data.get("group_chat_id")
+    if not chat_id:
+        await update.message.reply_text(
+            "❌ GROUP_CHAT_ID not configured in settings.",
+            parse_mode="HTML",
+        )
+        return
+    
+    try:
+        test_message = (
+            "🧪 <b>Test Message from Admin</b>\n\n"
+            f"Group Chat ID: <code>{chat_id}</code>\n"
+            "If you see this, group notifications are working!"
+        )
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=test_message,
+            parse_mode="HTML",
+        )
+        await update.message.reply_text(
+            f"✅ Test message sent to group {chat_id}",
+            parse_mode="HTML",
+        )
+    except TelegramError as exc:
+        error_msg = (
+            f"❌ Failed to send test message to group {chat_id}\n\n"
+            f"Error: {str(exc)}\n\n"
+            "Possible issues:\n"
+            "• Bot is not a member of the group\n"
+            "• Bot doesn't have permission to send messages\n"
+            "• GROUP_CHAT_ID is incorrect"
+        )
+        await update.message.reply_text(error_msg, parse_mode="HTML")
+        logger.error(f"Failed to send test message to group: {exc}", exc_info=True)
+
+
 async def handle_admin_sessions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """List all active sessions."""
     if not await _require_admin(update, context) or not update.message:
@@ -2310,6 +2357,7 @@ def main() -> None:
     application.add_handler(CommandHandler("stats", handle_admin_stats))
     application.add_handler(CommandHandler("debug", handle_admin_debug))
     application.add_handler(CommandHandler("sessions", handle_admin_sessions))
+    application.add_handler(CommandHandler("testgroup", handle_admin_test_group))
     application.add_handler(MessageHandler(filters.CONTACT, handle_contact_shared))
     application.add_handler(MessageHandler(filters.LOCATION, handle_location_shared))
     application.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
@@ -2317,7 +2365,10 @@ def main() -> None:
 
     logger.info("Codexs Telegram bot started.")
     logger.info(f"Admin User IDs configured: {settings.admin_user_ids}")
+    logger.info(f"Group Chat ID configured: {settings.group_chat_id}")
     logger.info(f"Total admin commands registered: 5 (admin, status, stats, debug, sessions)")
+    if not settings.group_chat_id:
+        logger.warning("⚠️ GROUP_CHAT_ID not set! Application notifications will not be sent to group.")
     application.run_polling()
 
 

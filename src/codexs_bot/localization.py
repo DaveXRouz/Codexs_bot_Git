@@ -901,7 +901,8 @@ ADMIN_MENU = {
         "/status – Bot status and health\n"
         "/stats – Application and user statistics\n"
         "/debug &lt;user_id&gt; – Debug user session\n"
-        "/sessions – List active sessions\n\n"
+        "/sessions – List active sessions\n"
+        "/testgroup – Test group notification\n\n"
         "All commands require admin privileges."
     ),
     Language.FA: (
@@ -911,7 +912,8 @@ ADMIN_MENU = {
         "/status – وضعیت و سلامت ربات\n"
         "/stats – آمار درخواست‌ها و کاربران\n"
         "/debug &lt;user_id&gt; – اشکال‌زدایی جلسه کاربر\n"
-        "/sessions – لیست جلسات فعال\n\n"
+        "/sessions – لیست جلسات فعال\n"
+        "/testgroup – تست اعلان گروه\n\n"
         "همه دستورات نیاز به دسترسی ادمین دارند."
     ),
 }
