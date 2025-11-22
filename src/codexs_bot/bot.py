@@ -1438,10 +1438,16 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         )
         return
 
+    if not update.effective_user:
+        await update.message.reply_text(
+            ERROR_GENERIC[language],
+            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        )
+        return
+    
     voice_message = update.message.voice
     audio_message = update.message.audio
     telegram_media = voice_message or audio_message
-    language = session.language
     
     if telegram_media is None:
         await update.message.reply_text(
@@ -1463,6 +1469,16 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     try:
         file = await telegram_media.get_file()
+    except TelegramError as exc:
+        logger.error(f"Failed to get voice file: {exc}", exc_info=True)
+        await update.message.reply_text(
+            ERROR_VOICE_INVALID[language],
+            reply_markup=_keyboard_with_back(None, language),
+            parse_mode="HTML",
+        )
+        return
+    
+    try:
         settings = _get_settings(context)
         voice_dir: Path = settings.voice_dir
         if voice_message:
@@ -1960,6 +1976,7 @@ async def handle_contact_shared(update: Update, context: ContextTypes.DEFAULT_TY
     if session.edit_mode:
         session.edit_mode = False
         session.flow = Flow.CONFIRM
+        await _save_session(update, context, session)
         await prompt_confirmation(update, session)
         return
     
@@ -2015,6 +2032,7 @@ async def handle_location_shared(update: Update, context: ContextTypes.DEFAULT_T
     if session.edit_mode:
         session.edit_mode = False
         session.flow = Flow.CONFIRM
+        await _save_session(update, context, session)
         await prompt_confirmation(update, session)
         return
     
