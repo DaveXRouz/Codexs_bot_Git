@@ -481,11 +481,13 @@ CONFIRM_PROMPT = {
 EDIT_PROMPT = {
     Language.EN: (
         "Please share the question number (1-12) you would like to edit.\n\n"
-        "💡 <b>Tip:</b> You can also re-record your voice sample by selecting 13."
+        "💡 <b>Tip:</b> You can also re-record your voice sample by selecting 13.\n\n"
+        "💬 <b>Cancel:</b> Use 'Back to main menu' to cancel editing and return to confirmation."
     ),
     Language.FA: (
         "لطفاً شماره سوال موردنظر برای ویرایش (۱ تا ۱۲) را بفرستید.\n\n"
-        "💡 <b>نکته:</b> می‌توانید نمونه صوتی خود را دوباره ضبط کنید با انتخاب ۱۳."
+        "💡 <b>نکته:</b> می‌توانید نمونه صوتی خود را دوباره ضبط کنید با انتخاب ۱۳.\n\n"
+        "💬 <b>لغو:</b> از 'بازگشت به منوی اصلی' برای لغو ویرایش و بازگشت به تأیید استفاده کنید."
     ),
 }
 
@@ -721,8 +723,20 @@ CONTACT_DECISION_REMINDER = {
 }
 
 FALLBACK_MESSAGE = {
-    Language.EN: "I couldn’t map that request. Use the buttons below or type /commands for shortcuts.",
-    Language.FA: "نتوانستم درخواست شما را تطبیق دهم. از دکمه‌ها استفاده کنید یا ‎/commands‎ را برای میانبرها بفرستید.",
+    Language.EN: (
+        "I couldn't understand that. Here are your options:\n\n"
+        "• Use the buttons below to navigate\n"
+        "• Type /menu to return to main menu\n"
+        "• Type /help for context-aware assistance\n"
+        "• Type /commands to see all available commands"
+    ),
+    Language.FA: (
+        "نتوانستم درخواست شما را درک کنم. گزینه‌های شما:\n\n"
+        "• از دکمه‌های زیر برای ناوبری استفاده کنید\n"
+        "• /menu را بزنید تا به منوی اصلی برگردید\n"
+        "• /help را بزنید برای راهنمایی\n"
+        "• /commands را بزنید تا همه دستورات را ببینید"
+    ),
 }
 
 SMART_FALLBACK_HINT = {
@@ -902,6 +916,7 @@ ADMIN_MENU = {
         "/stats – Application and user statistics\n"
         "/debug &lt;user_id&gt; – Debug user session\n"
         "/sessions – List active sessions\n"
+        "/cleanup – Clean up old session files\n"
         "/testgroup – Test group notification\n\n"
         "All commands require admin privileges."
     ),
@@ -913,6 +928,7 @@ ADMIN_MENU = {
         "/stats – آمار درخواست‌ها و کاربران\n"
         "/debug &lt;user_id&gt; – اشکال‌زدایی جلسه کاربر\n"
         "/sessions – لیست جلسات فعال\n"
+        "/cleanup – پاکسازی فایل‌های جلسه قدیمی\n"
         "/testgroup – تست اعلان گروه\n\n"
         "همه دستورات نیاز به دسترسی ادمین دارند."
     ),

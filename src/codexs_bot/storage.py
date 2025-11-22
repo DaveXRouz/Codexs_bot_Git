@@ -137,4 +137,26 @@ class DataStorage:
         # Sort by submission date (newest first)
         applications.sort(key=lambda x: x.get("submitted_at", ""), reverse=True)
         return applications
+    
+    async def cleanup_old_sessions(self, days_old: int = 30) -> int:
+        """Clean up session files older than specified days. Returns number of files deleted."""
+        if not self._sessions_dir.exists():
+            return 0
+        
+        from datetime import timedelta
+        cutoff_time = (datetime.now(timezone.utc) - timedelta(days=days_old)).timestamp()
+        deleted_count = 0
+        
+        def _cleanup_sessions():
+            nonlocal deleted_count
+            for session_file in self._sessions_dir.glob("session_*.json"):
+                try:
+                    if session_file.stat().st_mtime < cutoff_time:
+                        session_file.unlink()
+                        deleted_count += 1
+                except Exception:
+                    continue
+            return deleted_count
+        
+        return await asyncio.to_thread(_cleanup_sessions)
 

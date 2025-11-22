@@ -259,6 +259,25 @@ def _infer_menu_choice(text: str, language: Language) -> Optional[str]:
     return None
 
 
+def _build_edit_summary(session: UserSession, language: Language) -> str:
+    """Build a summary of current answers to help user decide what to edit."""
+    lines = ["<b>📋 Current Answers:</b>", ""]
+    for idx, question in enumerate(HIRING_QUESTIONS, 1):
+        value = session.answers.get(question.key)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            display = f"<i>(skipped)</i>"
+        else:
+            sanitized = _sanitize_html(str(value))
+            # Show first 50 chars for preview
+            if len(sanitized) > 50:
+                display = sanitized[:47] + "..."
+            else:
+                display = sanitized
+        lines.append(f"{idx}. <b>{question.summary_labels[language]}:</b> {display}")
+    lines.append("\n💡 <i>Select a number to edit, or use 'Back to main menu' to cancel.</i>")
+    return "\n".join(lines)
+
+
 def _format_question_box(progress: str, question_text: str, language: Language) -> str:
     """Format question with clean, minimal design."""
     # Split question text into title and instruction if they exist
@@ -715,6 +734,7 @@ async def _open_menu_section(
     if key == "contact":
         session.flow = Flow.CONTACT_MESSAGE
         session.contact_pending = True
+        await _save_session(update, context, session)  # Save session when entering contact flow
         await update.message.reply_text(
             CONTACT_INFO[language],
             reply_markup=ReplyKeyboardMarkup(yes_no_keyboard(language), resize_keyboard=True),
@@ -800,8 +820,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if choice is None:
             await send_language_prompt(update)
             return
+        # Save any existing session before resetting (in case user had incomplete work)
+        if session.has_incomplete_application() and update.effective_user:
+            await _save_session(update, context, session)
         session.reset_hiring()
         session.language = choice
+        await _save_session(update, context, session)  # Save new language preference
         await send_language_welcome(update, context, session)
         await show_main_menu(update, session)
         return
@@ -892,6 +916,21 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     if is_back_button(text, language):
+        # Handle back button in edit mode - return to confirmation
+        if session.edit_mode:
+            session.edit_mode = False
+            session.flow = Flow.CONFIRM
+            await _save_session(update, context, session)
+            await prompt_confirmation(update, session)
+            return
+        # Handle back button in awaiting_edit_selection - return to confirmation
+        if session.awaiting_edit_selection:
+            session.awaiting_edit_selection = False
+            session.flow = Flow.CONFIRM
+            await _save_session(update, context, session)
+            await prompt_confirmation(update, session)
+            return
+        # Normal back button handling
         if session.flow in {Flow.APPLY, Flow.CONFIRM} or session.waiting_voice:
             session.request_exit_confirmation(session.flow)
             await update.message.reply_text(
@@ -973,7 +1012,25 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # Otherwise, edit the selected question
         session.edit_mode = True
         session.question_index = number - 1
+        question = HIRING_QUESTIONS[session.question_index]
+        current_answer = session.answers.get(question.key)
+        
+        # Show current answer before asking for new one
+        if current_answer and str(current_answer).strip():
+            current_display = _sanitize_html(str(current_answer))
+            if len(current_display) > 100:
+                current_display = current_display[:97] + "..."
+            preview_msg = f"<b>📝 Current answer:</b> <i>{current_display}</i>\n\n"
+        else:
+            preview_msg = f"<b>📝 Current answer:</b> <i>(skipped)</i>\n\n"
+        
         await _save_session(update, context, session)
+        # Send preview first, then ask question
+        if update.message:
+            await update.message.reply_text(
+                preview_msg + "<b>Enter your new answer:</b>",
+                parse_mode="HTML",
+            )
         await ask_current_question(update, session)
         return
 
@@ -988,9 +1045,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if is_no(text, language):
             session.awaiting_edit_selection = True
             await _save_session(update, context, session)
+            # Show current answers summary to help user decide what to edit
+            edit_summary = _build_edit_summary(session, language)
             await update.message.reply_text(
-                EDIT_PROMPT[language],
+                edit_summary + "\n\n" + EDIT_PROMPT[language],
                 reply_markup=ReplyKeyboardMarkup(edit_keyboard(language), resize_keyboard=True),
+                parse_mode="HTML",
             )
             return
         await update.message.reply_text(
@@ -1058,7 +1118,11 @@ async def handle_main_menu_choice(
         await _open_menu_section(matched_key, update, context, session, language)
         return
     if matched_key == "switch":
+        # Save session before language switch to preserve any incomplete work
+        if session.has_incomplete_application() and update.effective_user:
+            await _save_session(update, context, session)
         session.language = switch_language(language)
+        await _save_session(update, context, session)  # Save new language preference
         await show_main_menu(update, session)
         return
 
@@ -1256,10 +1320,14 @@ async def ask_current_question(update: Update, session: UserSession) -> None:
         keyboard_rows = question.keyboard[language] if question.keyboard else None
         keyboard = _keyboard_with_back(keyboard_rows, language)
     
-    progress = QUESTION_PROGRESS[language].format(
-        current=session.question_index + 1,
-        total=len(HIRING_QUESTIONS),
-    )
+    # Enhanced progress indicator with visual bar
+    current_q = session.question_index + 1
+    total_q = len(HIRING_QUESTIONS)
+    percentage = int((current_q / total_q) * 100)
+    # Visual progress bar (10 blocks)
+    filled = int((current_q / total_q) * 10)
+    progress_bar = "█" * filled + "░" * (10 - filled)
+    progress = f"{QUESTION_PROGRESS[language].format(current=current_q, total=total_q)} ({percentage}%)\n{progress_bar}"
     
     # Extract question text and instruction from prompts
     prompt_text = question.prompts[language]
@@ -1404,6 +1472,9 @@ async def handle_application_answer(
 
     if question.optional and cleaned and is_skip(cleaned, language):
         value = None
+    # Normalize empty strings to None for optional fields to ensure consistent data storage
+    if question.optional and value == "":
+        value = None
     session.answers[question.key] = value
     logger.info(f"Saved answer for '{question.key}': '{value}' (Question {session.question_index + 1}/{len(HIRING_QUESTIONS)})")
     await _save_session(update, context, session)
@@ -1521,24 +1592,24 @@ async def prompt_confirmation(update: Update, session: UserSession) -> None:
     language = session.language or Language.EN
     session.flow = Flow.CONFIRM
     
-    def _truncate_text(text: str, max_length: int = 100) -> str:
-        """Truncate long text with ellipsis."""
+    def _truncate_text(text: str, max_length: int = 150) -> str:
+        """Truncate long text with ellipsis. Increased to 150 for better visibility."""
         if len(text) <= max_length:
             return text
         return text[:max_length - 3] + "..."
     
+    def _format_answer_for_summary(value: Optional[str], max_length: int = 150) -> str:
+        """Format answer for summary display with better truncation."""
+        if value is None or (isinstance(value, str) and not value.strip()):
+            return f"<i>{SKIPPED_TEXT[language]}</i>"
+        sanitized = _sanitize_html(str(value))
+        # Show more characters (150 instead of 80) for better context
+        return _truncate_text(sanitized, max_length=max_length)
+    
     summary_lines = [f"<b>{SUMMARY_HEADER[language]}</b>", ""]
     for question in HIRING_QUESTIONS:
         value = session.answers.get(question.key)
-        if value is None:
-            display = f"<i>{SKIPPED_TEXT[language]}</i>"
-        elif value:
-            # Sanitize HTML in summary to prevent XSS
-            sanitized = _sanitize_html(str(value))
-            # Truncate long answers for readability
-            display = _truncate_text(sanitized, max_length=80)
-        else:
-            display = "—"
+        display = _format_answer_for_summary(value)
         summary_lines.append(f"<b>{question.summary_labels[language]}:</b> {display}")
     
     summary_lines.append("")  # Add spacing before voice status
@@ -2335,6 +2406,29 @@ async def handle_admin_test_group(update: Update, context: ContextTypes.DEFAULT_
         logger.error(f"Failed to send test message to group: {exc}", exc_info=True)
 
 
+async def handle_admin_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Clean up old session files."""
+    if not await _require_admin(update, context) or not update.message:
+        return
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    storage = _get_storage(context)
+    
+    try:
+        deleted_count = await storage.cleanup_old_sessions(days_old=30)
+        await update.message.reply_text(
+            f"✅ <b>Cleanup Complete</b>\n\nDeleted {deleted_count} old session files (older than 30 days).",
+            parse_mode="HTML",
+        )
+        logger.info(f"Admin cleanup: {deleted_count} sessions deleted")
+    except Exception as exc:
+        logger.error(f"Failed to cleanup sessions: {exc}", exc_info=True)
+        await update.message.reply_text(
+            f"❌ <b>Cleanup Failed</b>\n\nError: {str(exc)[:100]}",
+            parse_mode="HTML",
+        )
+
+
 async def handle_admin_sessions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """List all active sessions."""
     if not await _require_admin(update, context) or not update.message:
@@ -2426,6 +2520,7 @@ def main() -> None:
     application.add_handler(CommandHandler("stats", handle_admin_stats))
     application.add_handler(CommandHandler("debug", handle_admin_debug))
     application.add_handler(CommandHandler("sessions", handle_admin_sessions))
+    application.add_handler(CommandHandler("cleanup", handle_admin_cleanup))
     application.add_handler(CommandHandler("testgroup", handle_admin_test_group))
     application.add_handler(MessageHandler(filters.CONTACT, handle_contact_shared))
     application.add_handler(MessageHandler(filters.LOCATION, handle_location_shared))
@@ -2435,7 +2530,7 @@ def main() -> None:
     logger.info("Codexs Telegram bot started.")
     logger.info(f"Admin User IDs configured: {settings.admin_user_ids}")
     logger.info(f"Group Chat ID configured: {settings.group_chat_id}")
-    logger.info(f"Total admin commands registered: 5 (admin, status, stats, debug, sessions)")
+    logger.info(f"Total admin commands registered: 7 (admin, status, stats, debug, sessions, cleanup, testgroup)")
     if not settings.group_chat_id:
         logger.warning("⚠️ GROUP_CHAT_ID not set! Application notifications will not be sent to group.")
     application.run_polling()
