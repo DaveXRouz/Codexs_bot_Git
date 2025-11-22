@@ -148,6 +148,9 @@ class UserSession:
             and self.question_index > 0
             and len(self.answers) > 0
         ) or (
+            self.flow == Flow.CONFIRM
+            and len(self.answers) > 0
+        ) or (
             self.waiting_voice
             and len(self.answers) > 0
         )

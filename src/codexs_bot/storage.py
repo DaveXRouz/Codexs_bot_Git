@@ -32,6 +32,7 @@ class DataStorage:
         voice_file_path: Optional[str],
         voice_file_id: Optional[str],
         application_id: Optional[str] = None,
+        voice_skipped: bool = False,
     ) -> None:
         payload = {
             "application_id": application_id,
@@ -41,6 +42,7 @@ class DataStorage:
             "answers": answers,
             "voice_file_path": voice_file_path,
             "voice_file_id": voice_file_id,
+            "voice_skipped": voice_skipped,
         }
         await self._append_jsonl(self._applications_file, payload, self._application_lock)
 

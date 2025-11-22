@@ -391,9 +391,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         session.voice_skipped = saved_session.voice_skipped
         session.user_chat_id = saved_session.user_chat_id
         session.last_menu_choice = saved_session.last_menu_choice
+        session.edit_mode = saved_session.edit_mode
+        session.awaiting_edit_selection = saved_session.awaiting_edit_selection
         
         language = session.language
-        progress = len([v for v in session.answers.values() if v])
+        # Count only non-empty answers
+        progress = len([v for v in session.answers.values() if v and str(v).strip()])
+        # Store original flow before setting to IDLE for resume prompt detection
+        original_flow = session.flow
+        session.flow = Flow.IDLE  # Set to IDLE so handle_text can detect resume prompt state
+        # Store original flow in a temporary field for resume logic
+        session.exit_confirmation_flow = original_flow  # Reuse this field temporarily
         await _send_landing_card(update, context)
         await update.message.reply_text(
             RESUME_PROMPT[language].format(progress=progress),
@@ -718,12 +726,16 @@ async def _open_menu_section(
         return
 
 
-async def handle_exit_confirmation(update: Update, session: UserSession, text: str) -> None:
+async def handle_exit_confirmation(update: Update, session: UserSession, text: str, context: Optional[ContextTypes.DEFAULT_TYPE] = None) -> None:
     if not update.message:
         return
     language = session.language or Language.EN
     if is_yes(text, language):
         session.cancel_exit_confirmation()
+        # Delete saved session if user confirms exit
+        if context and update.effective_user:
+            storage = _get_storage(context)
+            await storage.delete_session(update.effective_user.id)
         session.reset_hiring()
         await update.message.reply_text(
             EXIT_CONFIRM_DONE[language],
@@ -732,8 +744,9 @@ async def handle_exit_confirmation(update: Update, session: UserSession, text: s
         return
     if is_no(text, language):
         session.cancel_exit_confirmation()
+        await _save_session(update, context, session)
         await update.message.reply_text(EXIT_CONFIRM_CANCEL[language])
-        await resume_flow_after_cancel(update, session)
+        await resume_flow_after_cancel(update, session, context)
         return
     await update.message.reply_text(
         EXIT_CONFIRM_PROMPT[language],
@@ -741,7 +754,7 @@ async def handle_exit_confirmation(update: Update, session: UserSession, text: s
     )
 
 
-async def resume_flow_after_cancel(update: Update, session: UserSession) -> None:
+async def resume_flow_after_cancel(update: Update, session: UserSession, context: Optional[ContextTypes.DEFAULT_TYPE] = None) -> None:
     if not update.message:
         return
     language = session.language or Language.EN
@@ -795,17 +808,25 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     language = session.language
 
-    # Handle resume response
-    if session.flow == Flow.IDLE and session.has_incomplete_application():
+    # Handle resume response (check if we have incomplete application and flow is IDLE - resume prompt state)
+    if session.flow == Flow.IDLE and session.has_incomplete_application() and session.exit_confirmation_flow:
+        # exit_confirmation_flow is temporarily used to store original flow during resume prompt
+        original_flow = session.exit_confirmation_flow
+        session.exit_confirmation_flow = None  # Clear temporary storage
+        
         if text == RESUME_YES[language] or is_yes(text, language):
-            # Resume application
+            # Resume application - restore original flow
             if session.waiting_voice:
-                session.flow = Flow.APPLY  # Will be set to CONFIRM after voice
+                session.flow = Flow.APPLY
                 await update.message.reply_text(
                     VOICE_PROMPT[language],
                     reply_markup=_keyboard_with_back(None, language),
                     parse_mode="HTML",
                 )
+            elif original_flow == Flow.CONFIRM:
+                # Resume at confirmation stage
+                session.flow = Flow.CONFIRM
+                await prompt_confirmation(update, session)
             else:
                 session.flow = Flow.APPLY
                 await ask_current_question(update, session)
@@ -813,6 +834,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             return
         elif text == RESUME_NO[language] or is_no(text, language):
             # Start fresh - delete saved session
+            session.exit_confirmation_flow = None  # Clear temporary storage
             if update.effective_user:
                 storage = _get_storage(context)
                 await storage.delete_session(update.effective_user.id)
@@ -840,7 +862,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     if session.exit_confirmation_pending:
-        await handle_exit_confirmation(update, session, text)
+        await handle_exit_confirmation(update, session, text, context)
         return
 
     if is_back_button(text, language):
@@ -925,6 +947,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # Otherwise, edit the selected question
         session.edit_mode = True
         session.question_index = number - 1
+        await _save_session(update, context, session)
         await ask_current_question(update, session)
         return
 
@@ -938,6 +961,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             return
         if is_no(text, language):
             session.awaiting_edit_selection = True
+            await _save_session(update, context, session)
             await update.message.reply_text(
                 EDIT_PROMPT[language],
                 reply_markup=ReplyKeyboardMarkup(edit_keyboard(language), resize_keyboard=True),
@@ -1519,6 +1543,7 @@ async def finalize_application(update: Update, context: ContextTypes.DEFAULT_TYP
         voice_file_path=session.voice_file_path,
         voice_file_id=session.voice_file_id,
         application_id=application_id,
+        voice_skipped=session.voice_skipped,
     )
     notifier = _get_application_notifier(context)
     await notifier.post(
