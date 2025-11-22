@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .localization import Language
+
+logger = logging.getLogger(__name__)
 
 
 class DataStorage:
@@ -74,8 +77,6 @@ class DataStorage:
                 handle.write("\n")
         except (OSError, IOError, json.JSONEncodeError) as exc:
             # Log error but re-raise to be handled by caller
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Failed to write JSONL to {file_path}: {exc}", exc_info=True)
             raise
 
@@ -90,8 +91,6 @@ class DataStorage:
             await asyncio.to_thread(self._write_session, session_file, session_data)
         except Exception as exc:
             # Log error but don't crash - session will be lost but bot continues
-            import logging
-            logger = logging.getLogger(__name__)
             logger.error(f"Failed to save session for user {user_id}: {exc}", exc_info=True)
 
     @staticmethod
@@ -118,8 +117,6 @@ class DataStorage:
             return await asyncio.to_thread(self._read_session, session_file)
         except Exception as exc:
             # Log error but don't crash - session will be lost but bot continues
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(f"Failed to load session for user {user_id}: {exc}", exc_info=True)
             return None
 

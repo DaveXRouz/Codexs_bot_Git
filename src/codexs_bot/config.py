@@ -79,7 +79,12 @@ def load_settings() -> Settings:
     contact_webhook_url = os.getenv("CONTACT_WEBHOOK_URL")
     enable_media = os.getenv("ENABLE_MEDIA", "false").lower() in {"1", "true", "yes", "on"}
     group_chat_id = os.getenv("GROUP_CHAT_ID")
-    group_chat_id_value = int(group_chat_id) if group_chat_id else None
+    group_chat_id_value: Optional[int] = None
+    if group_chat_id:
+        try:
+            group_chat_id_value = int(group_chat_id)
+        except ValueError:
+            logger.warning(f"Invalid GROUP_CHAT_ID: {group_chat_id}. Must be an integer.")
     openai_api_key = os.getenv("OPENAI_API_KEY")
     openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
     
