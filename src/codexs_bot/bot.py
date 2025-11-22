@@ -996,12 +996,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         
         # If number is 13, allow re-recording voice
         if number == len(HIRING_QUESTIONS) + 1:
+            session.awaiting_edit_selection = False
+            session.edit_mode = False  # Clear edit mode when re-recording voice
             session.mark_voice_wait()
             session.voice_file_path = None
             session.voice_file_id = None
             session.voice_message_id = None
             session.user_chat_id = None
             session.voice_skipped = False
+            await _save_session(update, context, session)
             await update.message.reply_text(
                 RERECORD_VOICE_PROMPT[language],
                 reply_markup=_keyboard_with_back(None, language),
