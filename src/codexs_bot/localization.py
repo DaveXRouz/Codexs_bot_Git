@@ -395,14 +395,14 @@ HIRING_QUESTIONS: List[Question] = [
 
 HIRING_INTRO = {
     Language.EN: (
-        "<b>💼 Codexs Application</b>\n\n"
+        "<b>💼 Codexs</b>\n\n"
         "This form has <b>12 short questions</b> (~3 minutes)\n"
         "Plus a mandatory <b>English voice test</b>\n\n"
         "🔒 Your answers stay confidential with the Codexs hiring team\n"
         "✅ You can edit before final submission"
     ),
     Language.FA: (
-        "<b>💼 فرم درخواست Codexs</b>\n\n"
+        "<b>💼 Codexs</b>\n\n"
         "این فرم <b>۱۲ سؤال کوتاه</b> دارد (حدود ۳ دقیقه)\n"
         "به اضافه <b>تست صوتی انگلیسی اجباری</b>\n\n"
         "🔒 پاسخ‌ها نزد تیم استخدام Codexs محرمانه می‌ماند\n"
