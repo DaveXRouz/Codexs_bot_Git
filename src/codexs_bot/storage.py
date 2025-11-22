@@ -66,42 +66,72 @@ class DataStorage:
 
     @staticmethod
     def _write_jsonl(file_path: Path, payload: Dict[str, Any]) -> None:
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        with file_path.open("a", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False)
-            handle.write("\n")
+        """Write JSONL entry with error handling."""
+        try:
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            with file_path.open("a", encoding="utf-8") as handle:
+                json.dump(payload, handle, ensure_ascii=False)
+                handle.write("\n")
+        except (OSError, IOError, json.JSONEncodeError) as exc:
+            # Log error but re-raise to be handled by caller
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to write JSONL to {file_path}: {exc}", exc_info=True)
+            raise
 
     def _session_file(self, user_id: int) -> Path:
         """Get session file path for a user."""
         return self._sessions_dir / f"session_{user_id}.json"
 
     async def save_session(self, user_id: int, session_data: Dict[str, Any]) -> None:
-        """Save user session to disk."""
+        """Save user session to disk with error handling."""
         session_file = self._session_file(user_id)
-        await asyncio.to_thread(self._write_session, session_file, session_data)
+        try:
+            await asyncio.to_thread(self._write_session, session_file, session_data)
+        except Exception as exc:
+            # Log error but don't crash - session will be lost but bot continues
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to save session for user {user_id}: {exc}", exc_info=True)
 
     @staticmethod
     def _write_session(session_file: Path, session_data: Dict[str, Any]) -> None:
-        """Write session data to file."""
-        session_file.parent.mkdir(parents=True, exist_ok=True)
-        with session_file.open("w", encoding="utf-8") as handle:
-            json.dump(session_data, handle, ensure_ascii=False, indent=2)
+        """Write session data to file with error handling."""
+        try:
+            session_file.parent.mkdir(parents=True, exist_ok=True)
+            # Use atomic write: write to temp file, then rename
+            temp_file = session_file.with_suffix(session_file.suffix + ".tmp")
+            with temp_file.open("w", encoding="utf-8") as handle:
+                json.dump(session_data, handle, ensure_ascii=False, indent=2)
+            # Atomic rename (works on most filesystems)
+            temp_file.replace(session_file)
+        except (OSError, IOError, json.JSONEncodeError) as exc:
+            # Re-raise to be caught by save_session
+            raise
 
     async def load_session(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """Load user session from disk."""
+        """Load user session from disk with error handling."""
         session_file = self._session_file(user_id)
         if not session_file.exists():
             return None
         try:
             return await asyncio.to_thread(self._read_session, session_file)
-        except Exception:
+        except Exception as exc:
+            # Log error but don't crash - session will be lost but bot continues
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Failed to load session for user {user_id}: {exc}", exc_info=True)
             return None
 
     @staticmethod
     def _read_session(session_file: Path) -> Dict[str, Any]:
-        """Read session data from file."""
-        with session_file.open("r", encoding="utf-8") as handle:
-            return json.load(handle)
+        """Read session data from file with error handling."""
+        try:
+            with session_file.open("r", encoding="utf-8") as handle:
+                return json.load(handle)
+        except (json.JSONDecodeError, IOError, OSError) as exc:
+            # Re-raise to be caught by load_session
+            raise
 
     async def delete_session(self, user_id: int) -> None:
         """Delete user session file."""

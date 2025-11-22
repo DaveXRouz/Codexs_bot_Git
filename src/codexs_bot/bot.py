@@ -803,6 +803,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     
     # Rate limiting check
+    if not update.effective_user:
+        return  # Cannot rate limit without user ID
     user_id = update.effective_user.id
     if not _check_rate_limit(user_id):
         language = get_session(context.user_data).language or Language.EN
@@ -996,7 +998,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         
         # If number is 13, allow re-recording voice
         if number == len(HIRING_QUESTIONS) + 1:
-            session.awaiting_edit_selection = False
             session.edit_mode = False  # Clear edit mode when re-recording voice
             session.mark_voice_wait()
             session.voice_file_path = None
@@ -1533,7 +1534,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     # Validate file size (max 20MB for Telegram voice messages)
     MAX_VOICE_SIZE = 20 * 1024 * 1024  # 20MB in bytes
-    if telegram_media.file_size and telegram_media.file_size > MAX_VOICE_SIZE:
+    if telegram_media.file_size is not None and telegram_media.file_size > MAX_VOICE_SIZE:
         await update.message.reply_text(
             ERROR_VOICE_TOO_LARGE[language],
             reply_markup=_keyboard_with_back(None, language),

@@ -116,32 +116,55 @@ class UserSession:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "UserSession":
-        """Deserialize session from dictionary."""
+        """Deserialize session from dictionary with defensive error handling."""
         session = cls()
-        if data.get("language"):
-            session.language = Language(data["language"])
-        if data.get("flow"):
-            session.flow = Flow[data["flow"]]
-        session.question_index = data.get("question_index", 0)
-        session.answers = data.get("answers", {})
-        session.waiting_voice = data.get("waiting_voice", False)
-        session.voice_file_path = data.get("voice_file_path")
-        session.voice_file_id = data.get("voice_file_id")
-        session.voice_message_id = data.get("voice_message_id")
-        session.user_chat_id = data.get("user_chat_id")
-        session.is_candidate = data.get("is_candidate", False)
-        session.edit_mode = data.get("edit_mode", False)
-        session.contact_pending = data.get("contact_pending", False)
-        session.awaiting_edit_selection = data.get("awaiting_edit_selection", False)
-        session.voice_skipped = data.get("voice_skipped", False)
-        session.exit_confirmation_pending = data.get("exit_confirmation_pending", False)
-        if data.get("exit_confirmation_flow"):
-            session.exit_confirmation_flow = Flow[data["exit_confirmation_flow"]]
-        session.awaiting_view_roles = data.get("awaiting_view_roles", False)
-        session.last_menu_choice = data.get("last_menu_choice")
-        session.ai_reply_count = data.get("ai_reply_count", 0)
-        if data.get("ai_window_start"):
-            session.ai_window_start = datetime.fromisoformat(data["ai_window_start"])
+        try:
+            if data.get("language"):
+                try:
+                    session.language = Language(data["language"])
+                except (ValueError, KeyError):
+                    # Invalid language value - use None (will prompt for language)
+                    session.language = None
+            if data.get("flow"):
+                try:
+                    session.flow = Flow[data["flow"]]
+                except (ValueError, KeyError):
+                    # Invalid flow value - default to IDLE
+                    session.flow = Flow.IDLE
+            session.question_index = data.get("question_index", 0)
+            # Validate answers is a dict
+            answers = data.get("answers", {})
+            if isinstance(answers, dict):
+                session.answers = answers
+            else:
+                session.answers = {}
+            session.waiting_voice = data.get("waiting_voice", False)
+            session.voice_file_path = data.get("voice_file_path")
+            session.voice_file_id = data.get("voice_file_id")
+            session.voice_message_id = data.get("voice_message_id")
+            session.user_chat_id = data.get("user_chat_id")
+            session.is_candidate = data.get("is_candidate", False)
+            session.edit_mode = data.get("edit_mode", False)
+            session.contact_pending = data.get("contact_pending", False)
+            session.awaiting_edit_selection = data.get("awaiting_edit_selection", False)
+            session.voice_skipped = data.get("voice_skipped", False)
+            session.exit_confirmation_pending = data.get("exit_confirmation_pending", False)
+            if data.get("exit_confirmation_flow"):
+                try:
+                    session.exit_confirmation_flow = Flow[data["exit_confirmation_flow"]]
+                except (ValueError, KeyError):
+                    session.exit_confirmation_flow = None
+            session.awaiting_view_roles = data.get("awaiting_view_roles", False)
+            session.last_menu_choice = data.get("last_menu_choice")
+            session.ai_reply_count = data.get("ai_reply_count", 0)
+            if data.get("ai_window_start"):
+                try:
+                    session.ai_window_start = datetime.fromisoformat(data["ai_window_start"])
+                except (ValueError, TypeError):
+                    session.ai_window_start = None
+        except Exception:
+            # If anything goes wrong, return a fresh session
+            return cls()
         return session
 
     def has_incomplete_application(self) -> bool:
