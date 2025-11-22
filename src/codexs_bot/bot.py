@@ -400,8 +400,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         # Store original flow before setting to IDLE for resume prompt detection
         original_flow = session.flow
         session.flow = Flow.IDLE  # Set to IDLE so handle_text can detect resume prompt state
-        # Store original flow in a temporary field for resume logic
-        session.exit_confirmation_flow = original_flow  # Reuse this field temporarily
+        # Store original flow in a dedicated field for resume logic (not exit_confirmation_flow to avoid conflicts)
+        session.resume_original_flow = original_flow
         await _send_landing_card(update, context)
         await update.message.reply_text(
             RESUME_PROMPT[language].format(progress=progress),
@@ -809,13 +809,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     language = session.language
 
     # Handle resume response (check if we have incomplete application and flow is IDLE - resume prompt state)
-    if session.flow == Flow.IDLE and session.has_incomplete_application() and session.exit_confirmation_flow:
-        # exit_confirmation_flow is temporarily used to store original flow during resume prompt
-        original_flow = session.exit_confirmation_flow
-        session.exit_confirmation_flow = None  # Clear temporary storage
+    if session.flow == Flow.IDLE and session.has_incomplete_application() and session.resume_original_flow:
+        # resume_original_flow stores the original flow during resume prompt
+        original_flow = session.resume_original_flow
         
         if text == RESUME_YES[language] or is_yes(text, language):
             # Resume application - restore original flow
+            session.resume_original_flow = None  # Clear only after processing
             if session.waiting_voice:
                 session.flow = Flow.APPLY
                 await update.message.reply_text(
@@ -824,9 +824,21 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     parse_mode="HTML",
                 )
             elif original_flow == Flow.CONFIRM:
-                # Resume at confirmation stage
+                # Resume at confirmation stage - check if user was in edit mode
                 session.flow = Flow.CONFIRM
-                await prompt_confirmation(update, session)
+                if session.awaiting_edit_selection:
+                    # User was selecting which question to edit
+                    await update.message.reply_text(
+                        EDIT_PROMPT[language],
+                        reply_markup=ReplyKeyboardMarkup(edit_keyboard(language), resize_keyboard=True),
+                        parse_mode="HTML",
+                    )
+                elif session.edit_mode:
+                    # User was editing a question - should not happen, but handle gracefully
+                    await ask_current_question(update, session)
+                else:
+                    # Normal confirmation state
+                    await prompt_confirmation(update, session)
             else:
                 session.flow = Flow.APPLY
                 await ask_current_question(update, session)
@@ -834,7 +846,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             return
         elif text == RESUME_NO[language] or is_no(text, language):
             # Start fresh - delete saved session
-            session.exit_confirmation_flow = None  # Clear temporary storage
+            session.resume_original_flow = None  # Clear only after processing
             if update.effective_user:
                 storage = _get_storage(context)
                 await storage.delete_session(update.effective_user.id)
@@ -842,9 +854,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await show_main_menu(update, session)
             return
         else:
-            # Remind user to use buttons
+            # Remind user to use buttons - DON'T clear resume_original_flow here!
+            # Count only non-empty answers for progress
+            progress = len([v for v in session.answers.values() if v and str(v).strip()])
             await update.message.reply_text(
-                RESUME_PROMPT[language].format(progress=len([v for v in session.answers.values() if v])),
+                RESUME_PROMPT[language].format(progress=progress),
                 reply_markup=ReplyKeyboardMarkup(
                     [[RESUME_YES[language], RESUME_NO[language]]],
                     resize_keyboard=True,
@@ -853,7 +867,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             )
             return
 
+    # Handle menu/back commands - check resume prompt state first
     if _is_menu_command(text, language) or _is_back_command(text, language):
+        # If in resume prompt state, handle specially
+        if session.flow == Flow.IDLE and session.has_incomplete_application() and session.resume_original_flow:
+            # User wants to go to menu during resume prompt - clear resume state and go to menu
+            session.resume_original_flow = None
+            if update.effective_user:
+                storage = _get_storage(context)
+                await storage.delete_session(update.effective_user.id)
+            session.reset_hiring()
+            await show_main_menu(update, session)
+            return
+        # Normal exit confirmation check
         if _needs_exit_confirmation(session):
             await _prompt_exit_confirmation(update, session, language)
         else:

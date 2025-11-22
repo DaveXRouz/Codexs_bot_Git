@@ -33,6 +33,7 @@ class UserSession:
     voice_skipped: bool = False
     exit_confirmation_pending: bool = False
     exit_confirmation_flow: Optional[Flow] = None
+    resume_original_flow: Optional[Flow] = None  # Store original flow during resume prompt
     awaiting_view_roles: bool = False
     last_menu_choice: Optional[str] = None
     ai_reply_count: int = 0
@@ -52,6 +53,7 @@ class UserSession:
         self.voice_skipped = False
         self.exit_confirmation_pending = False
         self.exit_confirmation_flow = None
+        self.resume_original_flow = None
         self.awaiting_view_roles = False
         self.last_menu_choice = None
 
@@ -69,6 +71,7 @@ class UserSession:
         self.voice_skipped = False
         self.exit_confirmation_pending = False
         self.exit_confirmation_flow = None
+        self.resume_original_flow = None
         self.awaiting_view_roles = False
         self.last_menu_choice = "apply"
 
