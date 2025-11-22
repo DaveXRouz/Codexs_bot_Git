@@ -1254,6 +1254,174 @@ def edit_keyboard(language: Language) -> List[List[str]]:
     return rows
 
 
+# Group command strings
+GROUP_ONLY_COMMAND = {
+    Language.EN: "⚠️ This command is only available in group chats.",
+    Language.FA: "⚠️ این دستور فقط در چت‌های گروهی در دسترس است.",
+}
+
+GROUP_ADMIN_REQUIRED = {
+    Language.EN: "⚠️ This command requires group administrator privileges.",
+    Language.FA: "⚠️ این دستور نیاز به دسترسی مدیر گروه دارد.",
+}
+
+GROUP_HELP_TEXT = {
+    Language.EN: (
+        "<b>📊 Group Commands</b>\n\n"
+        "Available commands for group administrators:\n\n"
+        "/daily or /report – Daily report (applications and messages today)\n"
+        "/gstats – Detailed statistics (all-time and by period)\n"
+        "/recent – List recent applications (last 10)\n"
+        "/app &lt;id&gt; – View application details by ID\n"
+        "/ghelp – Show this help message\n\n"
+        "All commands require group administrator privileges."
+    ),
+    Language.FA: (
+        "<b>📊 دستورات گروه</b>\n\n"
+        "دستورات موجود برای مدیران گروه:\n\n"
+        "/daily یا /report – گزارش روزانه (درخواست‌ها و پیام‌های امروز)\n"
+        "/gstats – آمار تفصیلی (همه‌زمان و بر اساس دوره)\n"
+        "/recent – لیست درخواست‌های اخیر (آخرین ۱۰ مورد)\n"
+        "/app &lt;id&gt; – مشاهده جزئیات درخواست با شناسه\n"
+        "/ghelp – نمایش این پیام راهنما\n\n"
+        "همه دستورات نیاز به دسترسی مدیر گروه دارند."
+    ),
+}
+
+GROUP_DAILY_REPORT = {
+    Language.EN: (
+        "<b>📊 Daily Report</b>\n\n"
+        "<b>Today ({date})</b>\n"
+        "📝 Applications: {today_apps}\n"
+        "💬 Contact messages: {today_contacts}\n"
+        "🎤 Voice samples: {today_voices} received, {today_skipped} skipped\n"
+        "🌐 Language breakdown: {en_count} EN, {fa_count} FA\n\n"
+        "<b>This Week</b>\n"
+        "📝 Applications: {week_apps}\n"
+        "💬 Contact messages: {week_contacts}\n\n"
+        "<b>This Month</b>\n"
+        "📝 Applications: {month_apps}\n"
+        "💬 Contact messages: {month_contacts}\n\n"
+        "{recent_list}"
+    ),
+    Language.FA: (
+        "<b>📊 گزارش روزانه</b>\n\n"
+        "<b>امروز ({date})</b>\n"
+        "📝 درخواست‌ها: {today_apps}\n"
+        "💬 پیام‌های تماس: {today_contacts}\n"
+        "🎤 نمونه‌های صوتی: {today_voices} دریافت شده، {today_skipped} رد شده\n"
+        "🌐 تقسیم‌بندی زبان: {en_count} انگلیسی، {fa_count} فارسی\n\n"
+        "<b>این هفته</b>\n"
+        "📝 درخواست‌ها: {week_apps}\n"
+        "💬 پیام‌های تماس: {week_contacts}\n\n"
+        "<b>این ماه</b>\n"
+        "📝 درخواست‌ها: {month_apps}\n"
+        "💬 پیام‌های تماس: {month_contacts}\n\n"
+        "{recent_list}"
+    ),
+}
+
+GROUP_STATS_REPORT = {
+    Language.EN: (
+        "<b>📈 Statistics Report</b>\n\n"
+        "<b>All-Time Totals</b>\n"
+        "📝 Total applications: {total_apps}\n"
+        "💬 Total contact messages: {total_contacts}\n"
+        "👥 Unique applicants: {unique_users}\n"
+        "🎤 Voice samples: {total_voices} received, {total_skipped} skipped\n\n"
+        "<b>Language Breakdown</b>\n"
+        "🇬🇧 English: {en_count} ({en_percent}%)\n"
+        "🇮🇷 Farsi: {fa_count} ({fa_percent}%)\n\n"
+        "<b>By Period</b>\n"
+        "📅 Today: {today_apps} applications\n"
+        "📅 This week: {week_apps} applications\n"
+        "📅 This month: {month_apps} applications\n"
+        "📅 All time: {total_apps} applications"
+    ),
+    Language.FA: (
+        "<b>📈 گزارش آمار</b>\n\n"
+        "<b>مجموع همه‌زمان</b>\n"
+        "📝 کل درخواست‌ها: {total_apps}\n"
+        "💬 کل پیام‌های تماس: {total_contacts}\n"
+        "👥 متقاضیان منحصر به فرد: {unique_users}\n"
+        "🎤 نمونه‌های صوتی: {total_voices} دریافت شده، {total_skipped} رد شده\n\n"
+        "<b>تقسیم‌بندی زبان</b>\n"
+        "🇬🇧 انگلیسی: {en_count} ({en_percent}%)\n"
+        "🇮🇷 فارسی: {fa_count} ({fa_percent}%)\n\n"
+        "<b>بر اساس دوره</b>\n"
+        "📅 امروز: {today_apps} درخواست\n"
+        "📅 این هفته: {week_apps} درخواست\n"
+        "📅 این ماه: {month_apps} درخواست\n"
+        "📅 همه‌زمان: {total_apps} درخواست"
+    ),
+}
+
+GROUP_RECENT_APPLICATIONS = {
+    Language.EN: (
+        "<b>📋 Recent Applications</b>\n\n"
+        "{applications_list}\n\n"
+        "Total shown: {count} of {total}"
+    ),
+    Language.FA: (
+        "<b>📋 درخواست‌های اخیر</b>\n\n"
+        "{applications_list}\n\n"
+        "نمایش داده شده: {count} از {total}"
+    ),
+}
+
+GROUP_APPLICATION_DETAILS = {
+    Language.EN: (
+        "<b>📄 Application Details</b>\n\n"
+        "<b>Application ID:</b> <code>{application_id}</code>\n"
+        "<b>Submitted:</b> {submitted_at}\n"
+        "<b>Language:</b> {language}\n\n"
+        "<b>Applicant Information</b>\n"
+        "👤 Name: {name}\n"
+        "📧 Email: {email}\n"
+        "📱 Contact: {contact}\n"
+        "🌐 Location: {location}\n"
+        "🔗 Portfolio: {portfolio}\n"
+        "💬 Telegram: @{username} ({telegram_id})\n\n"
+        "<b>Application Answers</b>\n"
+        "{answers}\n\n"
+        "<b>Voice Sample</b>\n"
+        "{voice_status}"
+    ),
+    Language.FA: (
+        "<b>📄 جزئیات درخواست</b>\n\n"
+        "<b>شناسه درخواست:</b> <code>{application_id}</code>\n"
+        "<b>ارسال شده:</b> {submitted_at}\n"
+        "<b>زبان:</b> {language}\n\n"
+        "<b>اطلاعات متقاضی</b>\n"
+        "👤 نام: {name}\n"
+        "📧 ایمیل: {email}\n"
+        "📱 تماس: {contact}\n"
+        "🌐 موقعیت: {location}\n"
+        "🔗 نمونه کار: {portfolio}\n"
+        "💬 تلگرام: @{username} ({telegram_id})\n\n"
+        "<b>پاسخ‌های درخواست</b>\n"
+        "{answers}\n\n"
+        "<b>نمونه صوتی</b>\n"
+        "{voice_status}"
+    ),
+}
+
+GROUP_APPLICATION_NOT_FOUND = {
+    Language.EN: "❌ Application not found. Please check the application ID.",
+    Language.FA: "❌ درخواست یافت نشد. لطفاً شناسه درخواست را بررسی کنید.",
+}
+
+GROUP_APPLICATION_ITEM = {
+    Language.EN: (
+        "• <b>{name}</b> ({email})\n"
+        "  ID: <code>{application_id}</code> | {date} | {language} | {voice_status}"
+    ),
+    Language.FA: (
+        "• <b>{name}</b> ({email})\n"
+        "  شناسه: <code>{application_id}</code> | {date} | {language} | {voice_status}"
+    ),
+}
+
 def contact_keyboard(language: Language) -> List[List[str]]:
     """Keyboard for requesting contact sharing."""
     return [[SHARE_CONTACT_BUTTON[language]], [BACK_TO_MENU[language]]]

@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
+from telegram.constants import ChatType
 from telegram.error import TelegramError
 from telegram.ext import (
     Application,
@@ -110,6 +111,15 @@ from .localization import (
     ADMIN_DEBUG_USER,
     ADMIN_SESSIONS_LIST,
     ADMIN_NO_SESSIONS,
+    GROUP_ONLY_COMMAND,
+    GROUP_ADMIN_REQUIRED,
+    GROUP_HELP_TEXT,
+    GROUP_DAILY_REPORT,
+    GROUP_STATS_REPORT,
+    GROUP_RECENT_APPLICATIONS,
+    GROUP_APPLICATION_DETAILS,
+    GROUP_APPLICATION_NOT_FOUND,
+    GROUP_APPLICATION_ITEM,
     back_keyboard,
     contact_keyboard,
     edit_keyboard,
@@ -534,6 +544,33 @@ def _get_ai_responder(context: ContextTypes.DEFAULT_TYPE) -> Optional[OpenAIFall
     return context.application.bot_data.get("ai_responder")  # type: ignore[return-value]
 
 
+def _is_group_chat(update: Update) -> bool:
+    """Check if the message is from a group chat."""
+    if not update.effective_chat:
+        return False
+    return update.effective_chat.type in {ChatType.GROUP, ChatType.SUPERGROUP}
+
+
+async def _is_group_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Check if the user is a group administrator."""
+    if not update.effective_chat or not update.effective_user:
+        return False
+    
+    # In private chats, check if user is in ADMIN_USER_IDS
+    if update.effective_chat.type == ChatType.PRIVATE:
+        settings = _get_settings(context)
+        return update.effective_user.id in settings.admin_user_ids
+    
+    # In group chats, check if user is a group admin
+    try:
+        member = await update.effective_chat.get_member(update.effective_user.id)
+        return member.status in {"administrator", "creator"}
+    except Exception:
+        # If we can't check, fall back to ADMIN_USER_IDS check
+        settings = _get_settings(context)
+        return update.effective_user.id in settings.admin_user_ids
+
+
 async def _save_session(update: Update, context: ContextTypes.DEFAULT_TYPE, session: UserSession) -> None:
     """Save session to disk for persistence."""
     if not update.effective_user:
@@ -800,6 +837,11 @@ async def resume_flow_after_cancel(update: Update, session: UserSession, context
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not update.message or not update.message.text:
+        return
+    
+    # In group chats, ignore non-command messages
+    if _is_group_chat(update):
+        # Only process commands in groups, ignore regular chat
         return
     
     # Rate limiting check
@@ -2410,6 +2452,362 @@ async def handle_admin_test_group(update: Update, context: ContextTypes.DEFAULT_
         logger.error(f"Failed to send test message to group: {exc}", exc_info=True)
 
 
+async def handle_group_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show group commands help."""
+    if not update.message:
+        return
+    
+    # Check if user is group admin
+    if not await _is_group_admin(update, context):
+        # Try to get language from session or default to EN
+        session = get_session(context.user_data)
+        language = session.language or Language.EN
+        await update.message.reply_text(
+            GROUP_ADMIN_REQUIRED[language],
+            parse_mode="HTML",
+        )
+        return
+    
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    await update.message.reply_text(
+        GROUP_HELP_TEXT[language],
+        parse_mode="HTML",
+    )
+
+
+async def handle_group_daily_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Generate and send daily report."""
+    if not update.message:
+        return
+    
+    # Check if user is group admin
+    if not await _is_group_admin(update, context):
+        session = get_session(context.user_data)
+        language = session.language or Language.EN
+        await update.message.reply_text(
+            GROUP_ADMIN_REQUIRED[language],
+            parse_mode="HTML",
+        )
+        return
+    
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    storage = _get_storage(context)
+    
+    now = datetime.now(timezone.utc)
+    today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    week_start = now - timedelta(days=7)
+    month_start = now - timedelta(days=30)
+    
+    # Get applications
+    today_apps = await storage.get_applications_by_date_range(today_start, now)
+    week_apps = await storage.get_applications_by_date_range(week_start, now)
+    month_apps = await storage.get_applications_by_date_range(month_start, now)
+    
+    # Get contact messages
+    today_contacts = await storage.get_contact_messages_by_date_range(today_start, now)
+    week_contacts = await storage.get_contact_messages_by_date_range(week_start, now)
+    month_contacts = await storage.get_contact_messages_by_date_range(month_start, now)
+    
+    # Count voice samples
+    today_voices = sum(1 for app in today_apps if app.get("voice_file_path") or app.get("voice_file_id"))
+    today_skipped = sum(1 for app in today_apps if app.get("voice_skipped", False))
+    
+    # Language breakdown
+    en_count = sum(1 for app in today_apps if app.get("language") == "en")
+    fa_count = sum(1 for app in today_apps if app.get("language") == "fa")
+    
+    # Recent applications list (last 5)
+    recent_apps = today_apps[:5]
+    recent_list = ""
+    if recent_apps:
+        recent_items = []
+    for app in recent_apps:
+        applicant = app.get("applicant", {})
+        name = applicant.get("first_name", "") + " " + applicant.get("last_name", "")
+        name = name.strip() or "Unknown"
+        answers = app.get("answers", {})
+        email = answers.get("email", applicant.get("username", "N/A"))
+        app_id = app.get("application_id", "N/A")
+            app_lang = "EN" if app.get("language") == "en" else "FA"
+            voice_status = "✅ Voice" if (app.get("voice_file_path") or app.get("voice_file_id")) else "⏭️ Skipped"
+            submitted_at = app.get("submitted_at", "")
+            try:
+                dt = datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
+                date_str = dt.strftime("%H:%M")
+            except:
+                date_str = "N/A"
+            recent_items.append(
+                GROUP_APPLICATION_ITEM[language].format(
+                    name=name,
+                    email=email,
+                    application_id=app_id,
+                    date=date_str,
+                    language=app_lang,
+                    voice_status=voice_status,
+                )
+            )
+        recent_list = "\n".join(recent_items)
+    else:
+        recent_list = "No applications today." if language == Language.EN else "هیچ درخواستی امروز نیست."
+    
+    date_str = now.strftime("%Y-%m-%d")
+    
+    await update.message.reply_text(
+        GROUP_DAILY_REPORT[language].format(
+            date=date_str,
+            today_apps=len(today_apps),
+            today_contacts=len(today_contacts),
+            today_voices=today_voices,
+            today_skipped=today_skipped,
+            en_count=en_count,
+            fa_count=fa_count,
+            week_apps=len(week_apps),
+            week_contacts=len(week_contacts),
+            month_apps=len(month_apps),
+            month_contacts=len(month_contacts),
+            recent_list=recent_list,
+        ),
+        parse_mode="HTML",
+    )
+
+
+async def handle_group_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Generate and send detailed statistics."""
+    if not update.message:
+        return
+    
+    # Check if user is group admin
+    if not await _is_group_admin(update, context):
+        session = get_session(context.user_data)
+        language = session.language or Language.EN
+        await update.message.reply_text(
+            GROUP_ADMIN_REQUIRED[language],
+            parse_mode="HTML",
+        )
+        return
+    
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    storage = _get_storage(context)
+    
+    now = datetime.now(timezone.utc)
+    today_start = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    week_start = now - timedelta(days=7)
+    month_start = now - timedelta(days=30)
+    
+    # Get all applications
+    all_apps = await storage.get_all_applications()
+    today_apps = await storage.get_applications_by_date_range(today_start, now)
+    week_apps = await storage.get_applications_by_date_range(week_start, now)
+    month_apps = await storage.get_applications_by_date_range(month_start, now)
+    
+    # Get all contact messages
+    all_contacts = await storage.get_all_contact_messages()
+    
+    # Count unique users
+    unique_users = set()
+    for app in all_apps:
+        applicant = app.get("applicant", {})
+        user_id = applicant.get("telegram_id")
+        if user_id:
+            unique_users.add(user_id)
+    
+    # Voice samples
+    total_voices = sum(1 for app in all_apps if app.get("voice_file_path") or app.get("voice_file_id"))
+    total_skipped = sum(1 for app in all_apps if app.get("voice_skipped", False))
+    
+    # Language breakdown
+    en_count = sum(1 for app in all_apps if app.get("language") == "en")
+    fa_count = sum(1 for app in all_apps if app.get("language") == "fa")
+    total_lang = en_count + fa_count
+    en_percent = round((en_count / total_lang * 100) if total_lang > 0 else 0, 1)
+    fa_percent = round((fa_count / total_lang * 100) if total_lang > 0 else 0, 1)
+    
+    await update.message.reply_text(
+        GROUP_STATS_REPORT[language].format(
+            total_apps=len(all_apps),
+            total_contacts=len(all_contacts),
+            unique_users=len(unique_users),
+            total_voices=total_voices,
+            total_skipped=total_skipped,
+            en_count=en_count,
+            en_percent=en_percent,
+            fa_count=fa_count,
+            fa_percent=fa_percent,
+            today_apps=len(today_apps),
+            week_apps=len(week_apps),
+            month_apps=len(month_apps),
+        ),
+        parse_mode="HTML",
+    )
+
+
+async def handle_group_recent(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """List recent applications."""
+    if not update.message:
+        return
+    
+    # Check if user is group admin
+    if not await _is_group_admin(update, context):
+        session = get_session(context.user_data)
+        language = session.language or Language.EN
+        await update.message.reply_text(
+            GROUP_ADMIN_REQUIRED[language],
+            parse_mode="HTML",
+        )
+        return
+    
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    storage = _get_storage(context)
+    
+    # Get recent applications (last 10)
+    recent_apps = await storage.get_recent_applications(limit=10)
+    all_apps = await storage.get_all_applications()
+    
+    if not recent_apps:
+        await update.message.reply_text(
+            "No applications found." if language == Language.EN else "هیچ درخواستی یافت نشد.",
+            parse_mode="HTML",
+        )
+        return
+    
+    # Format applications list
+    app_items = []
+    for app in recent_apps:
+        applicant = app.get("applicant", {})
+        name = applicant.get("first_name", "") + " " + applicant.get("last_name", "")
+        name = name.strip() or "Unknown"
+        answers = app.get("answers", {})
+        email = answers.get("email", applicant.get("username", "N/A"))
+        app_id = app.get("application_id", "N/A")
+        app_lang = "EN" if app.get("language") == "en" else "FA"
+        voice_status = "✅ Voice" if (app.get("voice_file_path") or app.get("voice_file_id")) else "⏭️ Skipped"
+        submitted_at = app.get("submitted_at", "")
+        try:
+            dt = datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
+            date_str = dt.strftime("%Y-%m-%d %H:%M")
+        except:
+            date_str = "N/A"
+        app_items.append(
+            GROUP_APPLICATION_ITEM[language].format(
+                name=name,
+                email=email,
+                application_id=app_id,
+                date=date_str,
+                language=app_lang,
+                voice_status=voice_status,
+            )
+        )
+    
+    await update.message.reply_text(
+        GROUP_RECENT_APPLICATIONS[language].format(
+            applications_list="\n".join(app_items),
+            count=len(recent_apps),
+            total=len(all_apps),
+        ),
+        parse_mode="HTML",
+    )
+
+
+async def handle_group_app_details(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Show details of a specific application."""
+    if not update.message:
+        return
+    
+    # Check if user is group admin
+    if not await _is_group_admin(update, context):
+        session = get_session(context.user_data)
+        language = session.language or Language.EN
+        await update.message.reply_text(
+            GROUP_ADMIN_REQUIRED[language],
+            parse_mode="HTML",
+        )
+        return
+    
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+    storage = _get_storage(context)
+    
+    # Get application ID from command arguments
+    text = update.message.text or ""
+    parts = text.split()
+    if len(parts) < 2:
+        await update.message.reply_text(
+            "Usage: /app <application_id>" if language == Language.EN else "استفاده: /app <application_id>",
+            parse_mode="HTML",
+        )
+        return
+    
+    application_id = parts[1]
+    app = await storage.get_application_by_id(application_id)
+    
+    if not app:
+        await update.message.reply_text(
+            GROUP_APPLICATION_NOT_FOUND[language],
+            parse_mode="HTML",
+        )
+        return
+    
+    # Format application details
+    applicant = app.get("applicant", {})
+    name = applicant.get("first_name", "") + " " + applicant.get("last_name", "")
+    name = name.strip() or "Unknown"
+    telegram_id = applicant.get("telegram_id", "N/A")
+    username = applicant.get("username", "N/A") or "N/A"
+    
+    answers = app.get("answers", {})
+    email = answers.get("email", "N/A")
+    contact = answers.get("contact", "N/A")
+    location = answers.get("location", "N/A")
+    portfolio = answers.get("portfolio", "N/A")
+    
+    # Format answers
+    answer_lines = []
+    for key, value in answers.items():
+        if value:
+            answer_lines.append(f"• {key}: {value}")
+    answers_text = "\n".join(answer_lines) if answer_lines else "No answers provided."
+    
+    # Voice status
+    if app.get("voice_file_path") or app.get("voice_file_id"):
+        voice_status = "✅ Voice sample received"
+    elif app.get("voice_skipped", False):
+        voice_status = "⏭️ Voice sample skipped"
+    else:
+        voice_status = "❌ No voice sample"
+    
+    # Format date
+    submitted_at = app.get("submitted_at", "")
+    try:
+        dt = datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
+        date_str = dt.strftime("%Y-%m-%d %H:%M UTC")
+    except:
+        date_str = submitted_at
+    
+    app_lang = "English" if app.get("language") == "en" else "Farsi"
+    
+    await update.message.reply_text(
+        GROUP_APPLICATION_DETAILS[language].format(
+            application_id=app.get("application_id", "N/A"),
+            submitted_at=date_str,
+            language=app_lang,
+            name=name,
+            email=email,
+            contact=contact,
+            location=location,
+            portfolio=portfolio,
+            username=username,
+            telegram_id=telegram_id,
+            answers=answers_text,
+            voice_status=voice_status,
+        ),
+        parse_mode="HTML",
+    )
+
+
 async def handle_admin_cleanup(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Clean up old session files."""
     if not await _require_admin(update, context) or not update.message:
@@ -2526,6 +2924,13 @@ def main() -> None:
     application.add_handler(CommandHandler("sessions", handle_admin_sessions))
     application.add_handler(CommandHandler("cleanup", handle_admin_cleanup))
     application.add_handler(CommandHandler("testgroup", handle_admin_test_group))
+    # Group commands (work in both private and group chats, but require admin in groups)
+    application.add_handler(CommandHandler("daily", handle_group_daily_report))
+    application.add_handler(CommandHandler("report", handle_group_daily_report))
+    application.add_handler(CommandHandler("gstats", handle_group_stats))
+    application.add_handler(CommandHandler("recent", handle_group_recent))
+    application.add_handler(CommandHandler("app", handle_group_app_details))
+    application.add_handler(CommandHandler("ghelp", handle_group_help))
     application.add_handler(MessageHandler(filters.CONTACT, handle_contact_shared))
     application.add_handler(MessageHandler(filters.LOCATION, handle_location_shared))
     application.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))

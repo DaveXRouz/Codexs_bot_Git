@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -186,4 +186,107 @@ class DataStorage:
             return deleted_count
         
         return await asyncio.to_thread(_cleanup_sessions)
+
+    async def get_all_applications(self) -> List[Dict[str, Any]]:
+        """Get all applications from storage."""
+        if not self._applications_file.exists():
+            return []
+        try:
+            return await asyncio.to_thread(self._read_all_applications, self._applications_file)
+        except Exception:
+            return []
+
+    @staticmethod
+    def _read_all_applications(applications_file: Path) -> List[Dict[str, Any]]:
+        """Read all applications from file."""
+        applications = []
+        with applications_file.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    app = json.loads(line)
+                    applications.append(app)
+                except json.JSONDecodeError:
+                    continue
+        # Sort by submission date (newest first)
+        applications.sort(key=lambda x: x.get("submitted_at", ""), reverse=True)
+        return applications
+
+    async def get_applications_by_date_range(
+        self, start_date: datetime, end_date: datetime
+    ) -> List[Dict[str, Any]]:
+        """Get applications within a date range."""
+        all_apps = await self.get_all_applications()
+        filtered = []
+        for app in all_apps:
+            submitted_at_str = app.get("submitted_at")
+            if not submitted_at_str:
+                continue
+            try:
+                submitted_at = datetime.fromisoformat(submitted_at_str.replace("Z", "+00:00"))
+                if start_date <= submitted_at <= end_date:
+                    filtered.append(app)
+            except (ValueError, TypeError):
+                continue
+        return filtered
+
+    async def get_recent_applications(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """Get most recent applications."""
+        all_apps = await self.get_all_applications()
+        return all_apps[:limit]
+
+    async def get_application_by_id(self, application_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific application by ID."""
+        all_apps = await self.get_all_applications()
+        for app in all_apps:
+            if app.get("application_id") == application_id:
+                return app
+        return None
+
+    async def get_all_contact_messages(self) -> List[Dict[str, Any]]:
+        """Get all contact messages from storage."""
+        if not self._contact_file.exists():
+            return []
+        try:
+            return await asyncio.to_thread(self._read_all_contact_messages, self._contact_file)
+        except Exception:
+            return []
+
+    @staticmethod
+    def _read_all_contact_messages(contact_file: Path) -> List[Dict[str, Any]]:
+        """Read all contact messages from file."""
+        messages = []
+        with contact_file.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    msg = json.loads(line)
+                    messages.append(msg)
+                except json.JSONDecodeError:
+                    continue
+        # Sort by submission date (newest first)
+        messages.sort(key=lambda x: x.get("submitted_at", ""), reverse=True)
+        return messages
+
+    async def get_contact_messages_by_date_range(
+        self, start_date: datetime, end_date: datetime
+    ) -> List[Dict[str, Any]]:
+        """Get contact messages within a date range."""
+        all_messages = await self.get_all_contact_messages()
+        filtered = []
+        for msg in all_messages:
+            submitted_at_str = msg.get("submitted_at")
+            if not submitted_at_str:
+                continue
+            try:
+                submitted_at = datetime.fromisoformat(submitted_at_str.replace("Z", "+00:00"))
+                if start_date <= submitted_at <= end_date:
+                    filtered.append(msg)
+            except (ValueError, TypeError):
+                continue
+        return filtered
 
