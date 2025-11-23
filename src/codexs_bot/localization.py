@@ -416,7 +416,7 @@ QUESTION_PROGRESS = {
 }
 
 VOICE_SAMPLE_TEXT = (
-    "At Codexs dot A I, we build intelligent automation systems for global teams. "
+    "At Codexs, we build intelligent automation systems for global teams. "
     "Every project requires clear communication, async collaboration, and proactive problem-solving. "
     "Remote work demands precision in written updates and spoken English. "
     "Our engineers, designers, and operators coordinate across multiple time zones daily."
