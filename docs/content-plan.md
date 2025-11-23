@@ -62,8 +62,9 @@ Until assets arrive, disable images to keep UX clean (send text only).
 
 ## 6. Contact & Notifications
 - Contact info text:
-  - EN: “Email contact@codexs.ai or tap Yes to send us a short message here.”
+  - EN: "Email contact@codexs.ai or tap Yes to send us a short message here."
   - FA: localized equivalent.
+  - Note: Email address remains as contact@codexs.ai (actual email), but branding text uses "Codexs" without ".ai"
 - After message: “Saved for the ops team. Expect a reply within 1–2 business days.”
 - Add configuration for webhook/API so submissions include: name, email, phone, portfolio, voice path, Telegram ID, plus full answer dict.
 

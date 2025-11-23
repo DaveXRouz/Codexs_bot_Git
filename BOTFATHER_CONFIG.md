@@ -2,6 +2,8 @@
 
 This document provides the exact text to use in BotFather for your Codexs bot.
 
+**⚠️ Important Branding Note:** All user-facing text should use **"Codexs"** (without ".ai"). Only URLs and email addresses should include "codexs.ai" (e.g., `https://codexs.ai`, `contact@codexs.ai`).
+
 ---
 
 ## 🤖 Bot Name
