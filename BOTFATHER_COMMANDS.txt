@@ -1,5 +1,18 @@
-start - Start the Codexs Assistant and select your language
+start - Start the Codexs bot and select your language
 menu - Return to the main menu
 help - Get help and see what I can do for you
-commands - Show the list of commands and shortcuts
-
+commands - List all available commands
+admin - Admin panel (admin only)
+status - Bot health and status (admin only)
+stats - Application statistics (admin only)
+debug - Debug user session (admin only)
+sessions - List active sessions (admin only)
+cleanup - Clean up old session files (admin only)
+testadmin - Verify admin access (admin only)
+testgroup - Test group notifications (admin only)
+daily - Today's application report (group admin only)
+report - Today's application report (group admin only)
+gstats - Detailed statistics (group admin only)
+recent - List recent applications (group admin only)
+app - View application details by ID (group admin only)
+ghelp - Show group commands help (group admin only)
