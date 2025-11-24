@@ -1338,7 +1338,7 @@ async def show_application_history(
             f"<i>Showing 10 most recent applications. Total: {len(applications)}</i>" if language == Language.EN
             else f"<i>نمایش ۱۰ درخواست اخیر. مجموع: {len(applications)}</i>",
             parse_mode="HTML",
-        )
+    )
 
 
 async def ask_current_question(update: Update, session: UserSession) -> None:
@@ -1469,7 +1469,7 @@ async def handle_application_answer(
     if cleaned:
         if _is_menu_command(cleaned, language) or _is_back_command(cleaned, language) or is_back_button(cleaned, language):
             await _prompt_exit_confirmation(update, session, language)
-            return
+        return
         if _is_repeat_command(cleaned, language):
             await ask_current_question(update, session)
             return
@@ -1491,11 +1491,11 @@ async def handle_application_answer(
     if cleaned and not _validate_text_length(cleaned, max_length=1000):
         await _warn_and_repeat_question(update, session, question, language, ERROR_TEXT_TOO_LONG[language])
         return
-
+    
     if question.key == "email" and cleaned and not _validate_email(cleaned):
         await _warn_and_repeat_question(update, session, question, language, ERROR_EMAIL_INVALID[language])
         return
-
+    
     # Validate contact (phone number) if typed manually
     if question.key == "contact" and cleaned and question.input_type == "contact":
         # Only validate if it's typed text (not from contact button)
@@ -1561,7 +1561,7 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
         )
         return
-    
+
     voice_message = update.message.voice
     audio_message = update.message.audio
     telegram_media = voice_message or audio_message
@@ -2530,24 +2530,24 @@ async def handle_group_daily_report(update: Update, context: ContextTypes.DEFAUL
         answers = app.get("answers", {})
         email = answers.get("email", applicant.get("username", "N/A"))
         app_id = app.get("application_id", "N/A")
-            app_lang = "EN" if app.get("language") == "en" else "FA"
-            voice_status = "✅ Voice" if (app.get("voice_file_path") or app.get("voice_file_id")) else "⏭️ Skipped"
-            submitted_at = app.get("submitted_at", "")
-            try:
-                dt = datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
-                date_str = dt.strftime("%H:%M")
-            except:
-                date_str = "N/A"
-            recent_items.append(
-                GROUP_APPLICATION_ITEM[language].format(
-                    name=name,
-                    email=email,
-                    application_id=app_id,
-                    date=date_str,
-                    language=app_lang,
-                    voice_status=voice_status,
-                )
+        app_lang = "EN" if app.get("language") == "en" else "FA"
+        voice_status = "✅ Voice" if (app.get("voice_file_path") or app.get("voice_file_id")) else "⏭️ Skipped"
+        submitted_at = app.get("submitted_at", "")
+        try:
+            dt = datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
+            date_str = dt.strftime("%H:%M")
+        except:
+            date_str = "N/A"
+        recent_items.append(
+            GROUP_APPLICATION_ITEM[language].format(
+                name=name,
+                email=email,
+                application_id=app_id,
+                date=date_str,
+                language=app_lang,
+                voice_status=voice_status,
             )
+        )
         recent_list = "\n".join(recent_items)
     else:
         recent_list = "No applications today." if language == Language.EN else "هیچ درخواستی امروز نیست."
@@ -2880,8 +2880,8 @@ async def handle_admin_sessions(update: Update, context: ContextTypes.DEFAULT_TY
             count=len(session_files),
             sessions_list=sessions_text,
         ),
-        parse_mode="HTML",
-    )
+            parse_mode="HTML",
+        )
 
 
 def main() -> None:
