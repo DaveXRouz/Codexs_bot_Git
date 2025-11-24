@@ -504,6 +504,12 @@ async def send_language_welcome(update: Update, context: ContextTypes.DEFAULT_TY
             welcome_banner_path = path
             break
     
+    # Ensure keyboard is shown immediately after language selection
+    main_menu_keyboard = ReplyKeyboardMarkup(
+        main_menu_labels(language),
+        resize_keyboard=True,
+    )
+    
     if welcome_banner_path and settings.enable_media:
         try:
             with open(welcome_banner_path, "rb") as banner_file:
@@ -511,13 +517,22 @@ async def send_language_welcome(update: Update, context: ContextTypes.DEFAULT_TY
                     photo=banner_file,
                     caption=WELCOME_MESSAGE[language],
                     parse_mode="HTML",
+                    reply_markup=main_menu_keyboard,
                 )
         except Exception as exc:
             logger.warning(f"Failed to send welcome banner: {exc}")
-            # Fallback to text only
-            await update.message.reply_text(WELCOME_MESSAGE[language], parse_mode="HTML")
+            # Fallback to text only with keyboard
+            await update.message.reply_text(
+                WELCOME_MESSAGE[language],
+                parse_mode="HTML",
+                reply_markup=main_menu_keyboard,
+            )
     else:
-        await update.message.reply_text(WELCOME_MESSAGE[language], parse_mode="HTML")
+        await update.message.reply_text(
+            WELCOME_MESSAGE[language],
+            parse_mode="HTML",
+            reply_markup=main_menu_keyboard,
+        )
 
 
 def _resolve_language_choice(text: str) -> Optional[Language]:
@@ -871,6 +886,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         session.language = choice
         await _save_session(update, context, session)  # Save new language preference
         await send_language_welcome(update, context, session)
+        # Show main menu immediately after welcome to ensure keyboard stays visible
         await show_main_menu(update, session)
         return
 
@@ -1469,7 +1485,7 @@ async def handle_application_answer(
     if cleaned:
         if _is_menu_command(cleaned, language) or _is_back_command(cleaned, language) or is_back_button(cleaned, language):
             await _prompt_exit_confirmation(update, session, language)
-        return
+            return
         if _is_repeat_command(cleaned, language):
             await ask_current_question(update, session)
             return

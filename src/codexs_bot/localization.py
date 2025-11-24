@@ -160,8 +160,8 @@ MENU_LABELS: Dict[str, Dict[Language, str]] = {
         Language.FA: "💼 ارسال درخواست همکاری",
     },
     "about": {
-        Language.EN: "🏢 About Codex",
-        Language.FA: "🏢 درباره Codex",
+        Language.EN: "🏢 About Codexs",
+        Language.FA: "🏢 درباره Codexs",
     },
     "updates": {
         Language.EN: "📢 Updates & news",
