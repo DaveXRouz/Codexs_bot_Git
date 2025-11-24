@@ -111,10 +111,10 @@ pytest --cov=src/codexs_bot --cov-report=html
 
 ## 📚 Documentation
 
-- `QUICK_START.md` - Quick setup guide
-- `CLOUD_DEPLOYMENT.md` - Detailed cloud deployment instructions
+- `COMPLETE_PROJECT_DOCUMENTATION.md` - Complete project reference (all features, commands, functions)
+- `PROJECT_QUICK_REFERENCE.md` - Quick reference guide
+- `CLOUD_DEPLOYMENT.md` - Cloud deployment guide (Railway, Render, etc.)
 - `BOTFATHER_CONFIG.md` - BotFather configuration guide
-- `FINAL_STATUS.md` - Current project status
 
 ## 🔒 Security
 
@@ -136,4 +136,4 @@ For issues or questions, contact the development team.
 
 **Status**: ✅ Production Ready | ✅ All Tests Passing | ✅ Security Hardened
 
-📋 **See [PROJECT_STATUS.md](PROJECT_STATUS.md) for detailed project status and completed features.**
+📋 **See [COMPLETE_PROJECT_DOCUMENTATION.md](COMPLETE_PROJECT_DOCUMENTATION.md) for complete project documentation.**

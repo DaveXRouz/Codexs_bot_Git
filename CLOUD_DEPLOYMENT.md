@@ -21,29 +21,34 @@ Your local PC can't run 24/7 if it's turned off. To keep the bot running **alway
    - Select "Deploy from GitHub repo" (or upload your code)
 
 3. **Configure environment:**
+   - Go to "Variables" tab
    - Add these environment variables:
      ```
      BOT_TOKEN=your_bot_token_here
      DATA_DIR=/app/data
      ENABLE_MEDIA=true
      GROUP_CHAT_ID=-5094334512
+     OPENAI_API_KEY=sk-... (optional)
+     ADMIN_USER_IDS=123456789,987654321 (optional)
      ```
 
-4. **Set start command:**
-   - In Railway settings, set start command:
-     ```
-     cd /app && source .venv/bin/activate && codexs-bot
-     ```
-   - Or create a `Procfile`:
-     ```
-     worker: python -m codexs_bot.bot
-     ```
+4. **Deploy:**
+   - Railway auto-detects Python and installs dependencies from `requirements.txt`
+   - Bot starts automatically using `railway.json` or `Procfile`
+   - Bot runs 24/7
 
-5. **Deploy:**
-   - Railway auto-detects Python and installs dependencies
-   - Bot starts automatically and runs 24/7
+5. **Monitor:**
+   - Check "Deployments" tab for build progress
+   - View real-time logs
+   - Check "Metrics" for CPU/memory usage
 
 **Cost:** Free tier: $5/month credit (usually enough for a bot)
+
+**Troubleshooting:**
+- If bot not responding, check logs in "Deployments" tab
+- Verify `BOT_TOKEN` is correct in "Variables" tab
+- Check Python version (should be 3.11+)
+- Restart service from "Settings" if needed
 
 ---
 
