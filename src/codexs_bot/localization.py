@@ -724,6 +724,29 @@ CONTACT_DECISION_REMINDER = {
     Language.FA: "لطفاً دکمه بله یا خیر را بزنید تا بدانم باید پیام بگیرم یا خیر.",
 }
 
+CONTACT_MESSAGE_REVIEW = {
+    Language.EN: (
+        "<b>📝 Review Your Message</b>\n\n"
+        "{message}\n\n"
+        "Would you like to send this message or edit it?"
+    ),
+    Language.FA: (
+        "<b>📝 بررسی پیام شما</b>\n\n"
+        "{message}\n\n"
+        "مایلید این پیام را ارسال کنید یا ویرایش کنید؟"
+    ),
+}
+
+CONTACT_SEND_BUTTON = {
+    Language.EN: "✅ Send Message",
+    Language.FA: "✅ ارسال پیام",
+}
+
+CONTACT_EDIT_BUTTON = {
+    Language.EN: "✏️ Edit Message",
+    Language.FA: "✏️ ویرایش پیام",
+}
+
 FALLBACK_MESSAGE = {
     Language.EN: (
         "I couldn't understand that. Here are your options:\n\n"

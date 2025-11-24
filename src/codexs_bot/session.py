@@ -29,6 +29,8 @@ class UserSession:
     is_candidate: bool = False
     edit_mode: bool = False
     contact_pending: bool = False
+    contact_message_draft: Optional[str] = None  # Store draft message for review
+    contact_review_pending: bool = False  # Flag for review step
     awaiting_edit_selection: bool = False
     voice_skipped: bool = False
     exit_confirmation_pending: bool = False
@@ -49,6 +51,9 @@ class UserSession:
         self.voice_message_id = None
         self.user_chat_id = None
         self.edit_mode = False
+        self.contact_pending = False
+        self.contact_message_draft = None
+        self.contact_review_pending = False
         self.awaiting_edit_selection = False
         self.voice_skipped = False
         self.exit_confirmation_pending = False
@@ -67,6 +72,9 @@ class UserSession:
         self.voice_message_id = None
         self.user_chat_id = None
         self.edit_mode = False
+        self.contact_pending = False
+        self.contact_message_draft = None
+        self.contact_review_pending = False
         self.awaiting_edit_selection = False
         self.voice_skipped = False
         self.exit_confirmation_pending = False
@@ -104,6 +112,8 @@ class UserSession:
             "is_candidate": self.is_candidate,
             "edit_mode": self.edit_mode,
             "contact_pending": self.contact_pending,
+            "contact_message_draft": self.contact_message_draft,
+            "contact_review_pending": self.contact_review_pending,
             "awaiting_edit_selection": self.awaiting_edit_selection,
             "voice_skipped": self.voice_skipped,
             "exit_confirmation_pending": self.exit_confirmation_pending,
@@ -146,6 +156,8 @@ class UserSession:
             session.is_candidate = data.get("is_candidate", False)
             session.edit_mode = data.get("edit_mode", False)
             session.contact_pending = data.get("contact_pending", False)
+            session.contact_message_draft = data.get("contact_message_draft")
+            session.contact_review_pending = data.get("contact_review_pending", False)
             session.awaiting_edit_selection = data.get("awaiting_edit_selection", False)
             session.voice_skipped = data.get("voice_skipped", False)
             session.exit_confirmation_pending = data.get("exit_confirmation_pending", False)

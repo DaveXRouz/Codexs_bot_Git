@@ -41,11 +41,13 @@ from .localization import (
     FALLBACK_MESSAGE,
     HELP_TEXT,
     CONTACT_DECISION_REMINDER,
+    CONTACT_EDIT_BUTTON,
     CONTACT_INFO,
     CONTACT_MESSAGE_PROMPT,
+    CONTACT_MESSAGE_REVIEW,
+    CONTACT_SEND_BUTTON,
     CONTACT_SKIP,
     CONTACT_THANKS,
-    CONTACT_DECISION_REMINDER,
     CONFIRM_PROMPT,
     CONFIRMATION_IMAGE_CAPTION,
     EDIT_PROMPT,
@@ -782,8 +784,12 @@ async def _open_menu_section(
         return
 
     if key == "contact":
+        # Clear any pending flags from other flows to prevent cross-flow leakage
+        session.awaiting_view_roles = False
         session.flow = Flow.CONTACT_MESSAGE
         session.contact_pending = True
+        session.contact_review_pending = False
+        session.contact_message_draft = None
         await _save_session(update, context, session)  # Save session when entering contact flow
         await update.message.reply_text(
             CONTACT_INFO[language],
@@ -802,11 +808,19 @@ async def handle_exit_confirmation(update: Update, session: UserSession, text: s
     language = session.language or Language.EN
     if is_yes(text, language):
         session.cancel_exit_confirmation()
-        # Delete saved session if user confirms exit
+        # Delete saved session if user confirms exit - ensure complete cleanup
         if context and update.effective_user:
             storage = _get_storage(context)
             await storage.delete_session(update.effective_user.id)
+        # Complete state reset - clear all application-related state
         session.reset_hiring()
+        # Also clear any pending flags that might cause ghost drafts
+        session.resume_original_flow = None
+        session.awaiting_view_roles = False
+        session.last_menu_choice = None
+        # Save cleared state to ensure no residual data
+        if context:
+            await _save_session(update, context, session)
         await update.message.reply_text(
             EXIT_CONFIRM_DONE[language],
             reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
@@ -1009,6 +1023,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
 
+    # Handle awaiting_view_roles BEFORE contact flow to prevent cross-flow leakage
     if session.awaiting_view_roles:
         if text == VIEW_ROLES_YES[language] or is_yes(text, language):
             session.awaiting_view_roles = False
@@ -1120,11 +1135,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     if session.flow == Flow.CONTACT_MESSAGE:
-        # Refactored contact flow for clarity
+        # Refactored contact flow with review step
         if session.contact_pending:
             # User is deciding whether to send a message
             if is_yes(text, language):
                 session.contact_pending = False
+                session.contact_review_pending = False
+                session.contact_message_draft = None
                 await update.message.reply_text(
                     CONTACT_MESSAGE_PROMPT[language],
                     reply_markup=_keyboard_with_back(None, language),
@@ -1133,6 +1150,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             elif is_no(text, language):
                 session.flow = Flow.IDLE
                 session.contact_pending = False
+                session.contact_review_pending = False
+                session.contact_message_draft = None
                 await update.message.reply_text(
                     CONTACT_SKIP[language],
                     reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
@@ -1145,8 +1164,48 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     reply_markup=ReplyKeyboardMarkup(yes_no_keyboard(language), resize_keyboard=True),
                 )
                 return
+        elif session.contact_review_pending:
+            # User is reviewing the message - check for Send/Edit/Cancel
+            if text == CONTACT_SEND_BUTTON[language] or (is_yes(text, language) and session.contact_message_draft):
+                # Send the message
+                await save_contact_message(update, context, session, session.contact_message_draft)
+                # Clear contact state
+                session.flow = Flow.IDLE
+                session.contact_pending = False
+                session.contact_review_pending = False
+                session.contact_message_draft = None
+                return
+            elif text == CONTACT_EDIT_BUTTON[language] or is_back_button(text, language):
+                # Edit the message - go back to input
+                session.contact_review_pending = False
+                await update.message.reply_text(
+                    CONTACT_MESSAGE_PROMPT[language],
+                    reply_markup=_keyboard_with_back(None, language),
+                )
+                return
+            else:
+                # Remind user to use buttons
+                review_keyboard = ReplyKeyboardMarkup(
+                    [[CONTACT_SEND_BUTTON[language], CONTACT_EDIT_BUTTON[language]]],
+                    resize_keyboard=True,
+                )
+                await update.message.reply_text(
+                    CONTACT_MESSAGE_REVIEW[language].format(message=session.contact_message_draft),
+                    reply_markup=review_keyboard,
+                    parse_mode="HTML",
+                )
+                return
         else:
-            # User is sending the actual message
+            # User is typing the actual message
+            # Check if back button was pressed
+            if is_back_button(text, language):
+                session.flow = Flow.IDLE
+                session.contact_pending = False
+                session.contact_review_pending = False
+                session.contact_message_draft = None
+                await show_main_menu(update, session)
+                return
+            
             # Validate length first
             if not _validate_text_length(text, max_length=1000):
                 await update.message.reply_text(
@@ -1155,7 +1214,20 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     parse_mode="HTML",
                 )
                 return
-            await save_contact_message(update, context, session, text)
+            
+            # Store draft and show review
+            session.contact_message_draft = text
+            session.contact_review_pending = True
+            review_keyboard = ReplyKeyboardMarkup(
+                [[CONTACT_SEND_BUTTON[language], CONTACT_EDIT_BUTTON[language]]],
+                resize_keyboard=True,
+            )
+            await update.message.reply_text(
+                CONTACT_MESSAGE_REVIEW[language].format(message=text),
+                reply_markup=review_keyboard,
+                parse_mode="HTML",
+            )
+            await _save_session(update, context, session)
             return
 
     await handle_main_menu_choice(update, context, session, text)
@@ -1181,8 +1253,14 @@ async def handle_main_menu_choice(
         # Save session before language switch to preserve any incomplete work
         if session.has_incomplete_application() and update.effective_user:
             await _save_session(update, context, session)
-        session.language = switch_language(language)
-        await _save_session(update, context, session)  # Save new language preference
+        # Switch language and ensure complete refresh
+        new_language = switch_language(language)
+        session.language = new_language
+        # Clear any pending flags that might cause confusion
+        session.awaiting_view_roles = False
+        # Save new language preference
+        await _save_session(update, context, session)
+        # Show main menu with new language - this ensures full refresh
         await show_main_menu(update, session)
         return
 
@@ -1241,41 +1319,72 @@ async def share_updates(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         return
     cards = UPDATE_CARDS.get(language, [])
     settings = context.application.bot_data["settings"]
-    if not cards:
-        news = "\n".join(UPDATES[language])
+    
+    # Always show content - check both cards and fallback updates
+    has_content = False
+    
+    if cards:
+        has_content = True
+        for card in cards:
+            text = f"<b>{card['title']}</b>\n{card['body']}"
+            if card.get("cta_url"):
+                text += f"\n{card['cta_label']}: {card['cta_url']}"
+            
+            if settings.enable_media:
+                # Check if this is Global Ops Pods card and use local file
+                photo_path = None
+                if card.get("title") in ["Global Ops Pods", "پادهای عملیات جهانی"]:
+                    # Try both .png and .jpg extensions
+                    for ext in [".png", ".jpg", ".jpeg"]:
+                        ops_pods_path = settings.media_dir / f"global-ops-pods{ext}"
+                        if ops_pods_path.exists():
+                            photo_path = ops_pods_path
+                            break
+                
+                await _send_photo_with_fallback(
+                    update.message,
+                    card.get("photo"),
+                    text,
+                    photo_path=photo_path,
+                )
+            else:
+                await update.message.reply_text(text, parse_mode="HTML")
+    
+    # Fallback to UPDATES list if no cards
+    if not has_content:
+        news_items = UPDATES.get(language, [])
+        if news_items:
+            has_content = True
+            news = "\n".join(news_items)
+            await update.message.reply_text(
+                f"{news}\n\nMore: {UPDATES_LINK}",
+                reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+                parse_mode="HTML",
+            )
+    
+    # If still no content, show "no updates" message
+    if not has_content:
+        no_updates_msg = (
+            "📢 No updates available at the moment.\n\n"
+            "Check back later or visit {link} for the latest news."
+            if language == Language.EN
+            else "📢 در حال حاضر به‌روزرسانی‌ای موجود نیست.\n\n"
+            "بعداً بررسی کنید یا برای آخرین اخبار به {link} سر بزنید."
+        )
         await update.message.reply_text(
-            f"{news}\n\nMore: {UPDATES_LINK}",
+            no_updates_msg.format(link=UPDATES_LINK),
             reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            parse_mode="HTML",
         )
         return
-    for card in cards:
-        text = f"<b>{card['title']}</b>\n{card['body']}"
-        if card.get("cta_url"):
-            text += f"\n{card['cta_label']}: {card['cta_url']}"
-        
-        if settings.enable_media:
-            # Check if this is Global Ops Pods card and use local file
-            photo_path = None
-            if card.get("title") in ["Global Ops Pods", "پادهای عملیات جهانی"]:
-                # Try both .png and .jpg extensions
-                for ext in [".png", ".jpg", ".jpeg"]:
-                    ops_pods_path = settings.media_dir / f"global-ops-pods{ext}"
-                    if ops_pods_path.exists():
-                        photo_path = ops_pods_path
-                        break
-            
-            await _send_photo_with_fallback(
-                update.message,
-                card.get("photo"),
-                text,
-                photo_path=photo_path,
-            )
-        else:
-            await update.message.reply_text(text, parse_mode="HTML")
-    await update.message.reply_text(
-        f"{UPDATES_CTA[language]} {UPDATES_LINK}",
-        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
-    )
+    
+    # Show CTA if we displayed cards
+    if cards:
+        await update.message.reply_text(
+            f"{UPDATES_CTA[language]} {UPDATES_LINK}",
+            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            parse_mode="HTML",
+        )
 
 
 async def show_application_history(
