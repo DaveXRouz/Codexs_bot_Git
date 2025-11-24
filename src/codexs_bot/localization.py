@@ -17,7 +17,9 @@ LANGUAGE_BUTTONS: Dict[Language, str] = {
 }
 
 BILINGUAL_WELCOME = (
-    "Select your language to continue · زبان خود را برای ادامه انتخاب کنید"
+    "Select your language to continue\n"
+    "─────────────────────────────\n"
+    "زبان خود را برای ادامه انتخاب کنید"
 )
 
 LANGUAGE_PROMPT = {
@@ -812,8 +814,8 @@ MAIN_MENU_PROMPT = {
 }
 
 MENU_HELPER = {
-    Language.EN: "Use the blue buttons below. Tap ⬅️ Back to main menu anytime.",
-    Language.FA: "از دکمه‌های آبی زیر استفاده کنید و هر لحظه می‌توانید ⬅️ بازگشت به منوی اصلی را بزنید.",
+    Language.EN: "Use the buttons below to navigate.",
+    Language.FA: "از دکمه‌های زیر برای ناوبری استفاده کنید.",
 }
 
 MISSING_ANSWER = {

@@ -449,9 +449,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     session.contact_pending = False
     await _send_landing_card(update, context)
     await update.message.reply_text(
-        f"{BILINGUAL_WELCOME}\n\n"
-        f"🇬🇧 {LANGUAGE_PROMPT[Language.EN]}\n"
-        f"🇮🇷 {LANGUAGE_PROMPT[Language.FA]}",
+        BILINGUAL_WELCOME,
         reply_markup=_language_keyboard(),
     )
 
