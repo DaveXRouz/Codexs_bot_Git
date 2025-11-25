@@ -50,3 +50,4 @@ media/*.png
 media/*.gif
 media/*.mp4
 !media/.gitkeep
+*.md
