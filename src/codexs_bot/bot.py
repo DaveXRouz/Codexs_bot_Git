@@ -48,9 +48,11 @@ from .localization import (
     CONTACT_SEND_BUTTON,
     CONTACT_SKIP,
     CONTACT_THANKS,
+    CONTACT_DECISION_REMINDER,
     CONFIRM_PROMPT,
     CONFIRMATION_IMAGE_CAPTION,
     EDIT_PROMPT,
+    ERROR_APPLICATION_SAVE_FAILED,
     ERROR_CONTACT_INVALID,
     ERROR_EMAIL_INVALID,
     ERROR_GENERIC,
@@ -414,7 +416,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         session.language = saved_session.language
         session.flow = saved_session.flow
         session.question_index = saved_session.question_index
+        # Validate restored question_index
+        if not (0 <= session.question_index < len(HIRING_QUESTIONS)):
+            logger.warning(f"Invalid question_index {session.question_index} in saved session. Resetting to 0.")
+            session.question_index = 0
         session.answers = saved_session.answers.copy()
+        # Validate answers dict - ensure all keys are valid question keys
+        valid_keys = {q.key for q in HIRING_QUESTIONS}
+        session.answers = {k: v for k, v in session.answers.items() if k in valid_keys}
         session.waiting_voice = saved_session.waiting_voice
         session.voice_file_path = saved_session.voice_file_path
         session.voice_file_id = saved_session.voice_file_id
@@ -637,6 +646,57 @@ async def _require_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     return True
 
 
+def _validate_and_fix_session_state(session: UserSession) -> bool:
+    """
+    Validate session state consistency and fix invalid states.
+    Returns True if state was valid, False if it was fixed.
+    """
+    fixed = False
+    
+    # Validate question_index bounds when in APPLY flow
+    if session.flow == Flow.APPLY:
+        if not (0 <= session.question_index < len(HIRING_QUESTIONS)):
+            logger.warning(f"Invalid question_index {session.question_index} in APPLY flow. Resetting.")
+            session.question_index = 0
+            fixed = True
+    
+    # Validate waiting_voice state - should only be True in APPLY flow
+    if session.waiting_voice and session.flow != Flow.APPLY:
+        logger.warning(f"Invalid state: waiting_voice=True but flow={session.flow.name}. Fixing.")
+        session.waiting_voice = False
+        fixed = True
+    
+    # Validate contact flow state consistency
+    if session.flow == Flow.CONTACT_MESSAGE:
+        # If contact_review_pending is True, contact_message_draft should exist
+        if session.contact_review_pending and not session.contact_message_draft:
+            logger.warning("Invalid state: contact_review_pending=True but no draft. Fixing.")
+            session.contact_review_pending = False
+            fixed = True
+    else:
+        # If not in contact flow, clear contact-related flags
+        if session.contact_pending or session.contact_review_pending or session.contact_message_draft:
+            logger.warning(f"Invalid state: contact flags set but flow={session.flow.name}. Clearing.")
+            session.contact_pending = False
+            session.contact_review_pending = False
+            session.contact_message_draft = None
+            fixed = True
+    
+    # Validate edit_mode - should only be True in APPLY or CONFIRM flow
+    if session.edit_mode and session.flow not in (Flow.APPLY, Flow.CONFIRM):
+        logger.warning(f"Invalid state: edit_mode=True but flow={session.flow.name}. Fixing.")
+        session.edit_mode = False
+        fixed = True
+    
+    # Validate awaiting_edit_selection - should only be True in CONFIRM flow
+    if session.awaiting_edit_selection and session.flow != Flow.CONFIRM:
+        logger.warning(f"Invalid state: awaiting_edit_selection=True but flow={session.flow.name}. Fixing.")
+        session.awaiting_edit_selection = False
+        fixed = True
+    
+    return not fixed  # Return True if valid (not fixed), False if fixed
+
+
 def _summarize_session_state(session: UserSession, language: Language) -> str:
     if session.flow == Flow.APPLY:
         summary = f"User is filling the hiring application (question {session.question_index + 1}/12)."
@@ -788,8 +848,8 @@ async def _open_menu_section(
         session.awaiting_view_roles = False
         session.flow = Flow.CONTACT_MESSAGE
         session.contact_pending = True
-        session.contact_review_pending = False
         session.contact_message_draft = None
+        session.contact_review_pending = False
         await _save_session(update, context, session)  # Save session when entering contact flow
         await update.message.reply_text(
             CONTACT_INFO[language],
@@ -808,19 +868,17 @@ async def handle_exit_confirmation(update: Update, session: UserSession, text: s
     language = session.language or Language.EN
     if is_yes(text, language):
         session.cancel_exit_confirmation()
-        # Delete saved session if user confirms exit - ensure complete cleanup
+        # Delete saved session if user confirms exit
         if context and update.effective_user:
             storage = _get_storage(context)
             await storage.delete_session(update.effective_user.id)
-        # Complete state reset - clear all application-related state
+        # Clear all relevant flags including contact fields
         session.reset_hiring()
-        # Also clear any pending flags that might cause ghost drafts
+        session.contact_pending = False
+        session.contact_message_draft = None
+        session.contact_review_pending = False
         session.resume_original_flow = None
         session.awaiting_view_roles = False
-        session.last_menu_choice = None
-        # Save cleared state to ensure no residual data
-        if context:
-            await _save_session(update, context, session)
         await update.message.reply_text(
             EXIT_CONFIRM_DONE[language],
             reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
@@ -855,8 +913,29 @@ async def resume_flow_after_cancel(update: Update, session: UserSession, context
     if session.flow == Flow.CONFIRM:
         await prompt_confirmation(update, session)
         return
-    if session.flow == Flow.CONTACT_MESSAGE and session.contact_pending:
-        await update.message.reply_text(
+    if session.flow == Flow.CONTACT_MESSAGE:
+        if session.contact_review_pending:
+            # Resume at review step
+            review_keyboard = ReplyKeyboardMarkup(
+                [[CONTACT_SEND_BUTTON[language], CONTACT_EDIT_BUTTON[language]]],
+                resize_keyboard=True,
+            )
+            await update.message.reply_text(
+                CONTACT_MESSAGE_REVIEW[language].format(message=session.contact_message_draft or ""),
+                reply_markup=review_keyboard,
+                parse_mode="HTML",
+            )
+            return
+        elif session.contact_pending:
+            # Resume at Yes/No prompt
+            await update.message.reply_text(
+                CONTACT_INFO[language],
+                reply_markup=ReplyKeyboardMarkup(yes_no_keyboard(language), resize_keyboard=True),
+            )
+            return
+        else:
+            # Resume at message typing
+            await update.message.reply_text(
             CONTACT_MESSAGE_PROMPT[language],
             reply_markup=_keyboard_with_back(None, language),
         )
@@ -1023,7 +1102,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
 
-    # Handle awaiting_view_roles BEFORE contact flow to prevent cross-flow leakage
     if session.awaiting_view_roles:
         if text == VIEW_ROLES_YES[language] or is_yes(text, language):
             session.awaiting_view_roles = False
@@ -1087,6 +1165,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # Otherwise, edit the selected question
         session.edit_mode = True
         session.question_index = number - 1
+        # Double-check bounds after assignment (defensive programming)
+        if not (0 <= session.question_index < len(HIRING_QUESTIONS)):
+            logger.error(f"Invalid question_index {session.question_index} after edit selection. Resetting.")
+            session.question_index = 0
+            session.edit_mode = False
+            session.flow = Flow.IDLE
+            await show_main_menu(update, session)
+            return
         question = HIRING_QUESTIONS[session.question_index]
         current_answer = session.answers.get(question.key)
         
@@ -1135,49 +1221,19 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     if session.flow == Flow.CONTACT_MESSAGE:
-        # Refactored contact flow with review step
-        if session.contact_pending:
-            # User is deciding whether to send a message
-            if is_yes(text, language):
-                session.contact_pending = False
+        # Handle contact review step (Send/Edit buttons)
+        if session.contact_review_pending:
+            if text == CONTACT_SEND_BUTTON[language]:
+                # User confirmed - send the message
+                session.contact_review_pending = False
+                message_to_send = session.contact_message_draft or ""
+                session.contact_message_draft = None
+                await save_contact_message(update, context, session, message_to_send)
+                return
+            elif text == CONTACT_EDIT_BUTTON[language]:
+                # User wants to edit - clear review state and allow re-typing
                 session.contact_review_pending = False
                 session.contact_message_draft = None
-                await update.message.reply_text(
-                    CONTACT_MESSAGE_PROMPT[language],
-                    reply_markup=_keyboard_with_back(None, language),
-                )
-                return
-            elif is_no(text, language):
-                session.flow = Flow.IDLE
-                session.contact_pending = False
-                session.contact_review_pending = False
-                session.contact_message_draft = None
-                await update.message.reply_text(
-                    CONTACT_SKIP[language],
-                    reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
-                )
-                return
-            else:
-                # User sent text instead of Yes/No - show clarification
-                await update.message.reply_text(
-                    CONTACT_DECISION_REMINDER[language],
-                    reply_markup=ReplyKeyboardMarkup(yes_no_keyboard(language), resize_keyboard=True),
-                )
-                return
-        elif session.contact_review_pending:
-            # User is reviewing the message - check for Send/Edit/Cancel
-            if text == CONTACT_SEND_BUTTON[language] or (is_yes(text, language) and session.contact_message_draft):
-                # Send the message
-                await save_contact_message(update, context, session, session.contact_message_draft)
-                # Clear contact state
-                session.flow = Flow.IDLE
-                session.contact_pending = False
-                session.contact_review_pending = False
-                session.contact_message_draft = None
-                return
-            elif text == CONTACT_EDIT_BUTTON[language] or is_back_button(text, language):
-                # Edit the message - go back to input
-                session.contact_review_pending = False
                 await update.message.reply_text(
                     CONTACT_MESSAGE_PROMPT[language],
                     reply_markup=_keyboard_with_back(None, language),
@@ -1190,22 +1246,49 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     resize_keyboard=True,
                 )
                 await update.message.reply_text(
-                    CONTACT_MESSAGE_REVIEW[language].format(message=session.contact_message_draft),
+                    CONTACT_MESSAGE_REVIEW[language].format(message=session.contact_message_draft or ""),
                     reply_markup=review_keyboard,
                     parse_mode="HTML",
                 )
                 return
+        
+        # Handle Yes/No decision
+        if session.contact_pending:
+            # User is deciding whether to send a message
+            if is_yes(text, language):
+                session.contact_pending = False
+                await update.message.reply_text(
+                    CONTACT_MESSAGE_PROMPT[language],
+                    reply_markup=_keyboard_with_back(None, language),
+                )
+                return
+            elif is_no(text, language):
+                session.flow = Flow.IDLE
+                session.contact_pending = False
+                session.contact_message_draft = None
+                session.contact_review_pending = False
+                await update.message.reply_text(
+                    CONTACT_SKIP[language],
+                    reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+                )
+                return
+            else:
+                # User sent text instead of Yes/No - show clarification
+                await update.message.reply_text(
+                    CONTACT_DECISION_REMINDER[language],
+                    reply_markup=ReplyKeyboardMarkup(yes_no_keyboard(language), resize_keyboard=True),
+                )
+                return
         else:
             # User is typing the actual message
-            # Check if back button was pressed
             if is_back_button(text, language):
                 session.flow = Flow.IDLE
                 session.contact_pending = False
-                session.contact_review_pending = False
                 session.contact_message_draft = None
+                session.contact_review_pending = False
+                await _save_session(update, context, session)
                 await show_main_menu(update, session)
                 return
-            
             # Validate length first
             if not _validate_text_length(text, max_length=1000):
                 await update.message.reply_text(
@@ -1214,7 +1297,6 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     parse_mode="HTML",
                 )
                 return
-            
             # Store draft and show review
             session.contact_message_draft = text
             session.contact_review_pending = True
@@ -1253,14 +1335,14 @@ async def handle_main_menu_choice(
         # Save session before language switch to preserve any incomplete work
         if session.has_incomplete_application() and update.effective_user:
             await _save_session(update, context, session)
-        # Switch language and ensure complete refresh
-        new_language = switch_language(language)
-        session.language = new_language
-        # Clear any pending flags that might cause confusion
-        session.awaiting_view_roles = False
-        # Save new language preference
-        await _save_session(update, context, session)
-        # Show main menu with new language - this ensures full refresh
+        # Clear contact flow state when switching language
+        if session.flow == Flow.CONTACT_MESSAGE:
+            session.flow = Flow.IDLE
+            session.contact_pending = False
+            session.contact_message_draft = None
+            session.contact_review_pending = False
+        session.language = switch_language(language)
+        await _save_session(update, context, session)  # Save new language preference
         await show_main_menu(update, session)
         return
 
@@ -1276,10 +1358,10 @@ async def handle_main_menu_choice(
 
     if not await _maybe_ai_reply(update, context, session, text):
         await update.message.reply_text(
-            FALLBACK_MESSAGE[language],
-            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        FALLBACK_MESSAGE[language],
+        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
             parse_mode="HTML",
-        )
+    )
 
 
 async def share_about_story(update: Update, context: ContextTypes.DEFAULT_TYPE, session: UserSession, language: Language) -> None:
@@ -1319,51 +1401,45 @@ async def share_updates(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         return
     cards = UPDATE_CARDS.get(language, [])
     settings = context.application.bot_data["settings"]
-    
-    # Always show content - check both cards and fallback updates
-    has_content = False
-    
-    if cards:
-        has_content = True
-        for card in cards:
-            text = f"<b>{card['title']}</b>\n{card['body']}"
-            if card.get("cta_url"):
-                text += f"\n{card['cta_label']}: {card['cta_url']}"
+    news_items = UPDATES.get(language, [])
+    displayed_content = False
+
+    for card in cards:
+        text = f"<b>{card['title']}</b>\n{card['body']}"
+        if card.get("cta_url"):
+            text += f"\n{card.get('cta_label', 'Link')}: {card['cta_url']}"
+        
+        if settings.enable_media:
+            # Check if this is Global Ops Pods card and use local file
+            photo_path = None
+            if card.get("title") in ["Global Ops Pods", "پادهای عملیات جهانی"]:
+                # Try both .png and .jpg extensions
+                for ext in [".png", ".jpg", ".jpeg"]:
+                    ops_pods_path = settings.media_dir / f"global-ops-pods{ext}"
+                    if ops_pods_path.exists():
+                        photo_path = ops_pods_path
+                        break
             
-            if settings.enable_media:
-                # Check if this is Global Ops Pods card and use local file
-                photo_path = None
-                if card.get("title") in ["Global Ops Pods", "پادهای عملیات جهانی"]:
-                    # Try both .png and .jpg extensions
-                    for ext in [".png", ".jpg", ".jpeg"]:
-                        ops_pods_path = settings.media_dir / f"global-ops-pods{ext}"
-                        if ops_pods_path.exists():
-                            photo_path = ops_pods_path
-                            break
-                
-                await _send_photo_with_fallback(
-                    update.message,
-                    card.get("photo"),
-                    text,
-                    photo_path=photo_path,
-                )
-            else:
-                await update.message.reply_text(text, parse_mode="HTML")
-    
-    # Fallback to UPDATES list if no cards
-    if not has_content:
-        news_items = UPDATES.get(language, [])
-        if news_items:
-            has_content = True
-            news = "\n".join(news_items)
+            await _send_photo_with_fallback(
+                update.message,
+                card.get("photo"),
+                text,
+                photo_path=photo_path,
+            )
+        else:
+            await update.message.reply_text(text, parse_mode="HTML")
+        displayed_content = True
+
+    if news_items:
+        news = "\n".join(news_items).strip()
+        if news:
             await update.message.reply_text(
                 f"{news}\n\nMore: {UPDATES_LINK}",
                 reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
-                parse_mode="HTML",
             )
-    
-    # If still no content, show "no updates" message
-    if not has_content:
+            displayed_content = True
+
+    if not displayed_content:
         no_updates_msg = (
             "📢 No updates available at the moment.\n\n"
             "Check back later or visit {link} for the latest news."
@@ -1374,17 +1450,13 @@ async def share_updates(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         await update.message.reply_text(
             no_updates_msg.format(link=UPDATES_LINK),
             reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
-            parse_mode="HTML",
         )
         return
-    
-    # Show CTA if we displayed cards
-    if cards:
-        await update.message.reply_text(
-            f"{UPDATES_CTA[language]} {UPDATES_LINK}",
-            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
-            parse_mode="HTML",
-        )
+
+    await update.message.reply_text(
+        f"{UPDATES_CTA[language]} {UPDATES_LINK}",
+        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+    )
 
 
 async def show_application_history(
@@ -1468,6 +1540,15 @@ async def ask_current_question(update: Update, session: UserSession) -> None:
     if not update.message:
         return
     language = session.language or Language.EN
+    
+    # Validate question_index bounds to prevent IndexError crashes
+    if not (0 <= session.question_index < len(HIRING_QUESTIONS)):
+        logger.warning(f"Invalid question_index {session.question_index} for user {update.effective_user.id if update.effective_user else 'unknown'}. Resetting to safe state.")
+        session.question_index = 0
+        session.flow = Flow.IDLE
+        await show_main_menu(update, session)
+        return
+    
     question = HIRING_QUESTIONS[session.question_index]
     
     # Determine keyboard based on input type
@@ -1587,8 +1668,19 @@ async def handle_application_answer(
     if not update.message:
         return
     language = session.language or Language.EN
+    
+    # Validate question_index bounds
+    if not (0 <= session.question_index < len(HIRING_QUESTIONS)):
+        logger.warning(f"Invalid question_index {session.question_index} in handle_application_answer. Resetting.")
+        session.question_index = 0
+        session.flow = Flow.IDLE
+        await show_main_menu(update, session)
+        return
+    
     question = HIRING_QUESTIONS[session.question_index]
     cleaned = text.strip()
+    
+    # Handle commands and AI replies BEFORE processing as answer
     if cleaned:
         if _is_menu_command(cleaned, language) or _is_back_command(cleaned, language) or is_back_button(cleaned, language):
             await _prompt_exit_confirmation(update, session, language)
@@ -1596,8 +1688,14 @@ async def handle_application_answer(
         if _is_repeat_command(cleaned, language):
             await ask_current_question(update, session)
             return
-        await _maybe_answer_user_question(update, context, session, cleaned)
-
+        # Check if this looks like a question - if AI replies, don't process as answer
+        if _looks_like_question(cleaned, language):
+            # This might be a user question - try AI reply
+            ai_replied = await _maybe_ai_reply(update, context, session, cleaned)
+            if ai_replied:
+                # AI replied, so this was a question - don't process as answer
+                return
+    
     value: Optional[str] = cleaned or None
 
     if not cleaned:
@@ -1644,6 +1742,17 @@ async def handle_application_answer(
     # Normalize empty strings to None for optional fields to ensure consistent data storage
     if question.optional and value == "":
         value = None
+    
+    # Validate that question.key is a valid key (defensive programming)
+    valid_keys = {q.key for q in HIRING_QUESTIONS}
+    if question.key not in valid_keys:
+        logger.error(f"Invalid question key '{question.key}' - this should never happen!")
+        await update.message.reply_text(
+            ERROR_GENERIC[language],
+            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        )
+        return
+    
     session.answers[question.key] = value
     logger.info(f"Saved answer for '{question.key}': '{value}' (Question {session.question_index + 1}/{len(HIRING_QUESTIONS)})")
     await _save_session(update, context, session)
@@ -1671,7 +1780,12 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     session = get_session(context.user_data)
     language = session.language or Language.EN
-    if not session.waiting_voice or session.language is None:
+    
+    # Validate and fix session state consistency
+    _validate_and_fix_session_state(session)
+    
+    # Validate voice state - must be waiting for voice AND in APPLY flow
+    if not session.waiting_voice or session.language is None or session.flow != Flow.APPLY:
         await update.message.reply_text(
             ERROR_GENERIC[language],
             reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
@@ -1818,15 +1932,27 @@ async def finalize_application(update: Update, context: ContextTypes.DEFAULT_TYP
     logger.info(f"Voice skipped: {session.voice_skipped}")
     
     storage = _get_storage(context)
-    await storage.save_application(
-        applicant=applicant,
-        answers=session.answers,
-        language=language,
-        voice_file_path=session.voice_file_path,
-        voice_file_id=session.voice_file_id,
-        application_id=application_id,
-        voice_skipped=session.voice_skipped,
-    )
+    try:
+        await storage.save_application(
+            applicant=applicant,
+            answers=session.answers,
+            language=language,
+            voice_file_path=session.voice_file_path,
+            voice_file_id=session.voice_file_id,
+            application_id=application_id,
+            voice_skipped=session.voice_skipped,
+        )
+    except Exception as exc:
+        # CRITICAL: If save fails, don't clear session and inform user
+        logger.error(f"CRITICAL: Failed to save application {application_id}: {exc}", exc_info=True)
+        await update.message.reply_text(
+            ERROR_APPLICATION_SAVE_FAILED[language].format(app_id=application_id),
+            parse_mode="HTML",
+            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        )
+        # Don't clear session - user can try again
+        return
+    
     notifier = _get_application_notifier(context)
     await notifier.post(
         {
@@ -2239,10 +2365,23 @@ async def handle_location_shared(update: Update, context: ContextTypes.DEFAULT_T
     if not update.message or not update.message.location:
         return
     session = get_session(context.user_data)
+    
+    # Validate and fix session state consistency
+    _validate_and_fix_session_state(session)
+    
     if session.flow != Flow.APPLY:
         return
     
     language = session.language or Language.EN
+    
+    # Validate question_index bounds
+    if not (0 <= session.question_index < len(HIRING_QUESTIONS)):
+        logger.warning(f"Invalid question_index {session.question_index} in location handler. Resetting.")
+        session.question_index = 0
+        session.flow = Flow.IDLE
+        await show_main_menu(update, session)
+        return
+    
     question = HIRING_QUESTIONS[session.question_index]
     
     if question.input_type != "location":
@@ -2646,31 +2785,31 @@ async def handle_group_daily_report(update: Update, context: ContextTypes.DEFAUL
     recent_list = ""
     if recent_apps:
         recent_items = []
-    for app in recent_apps:
-        applicant = app.get("applicant", {})
-        name = applicant.get("first_name", "") + " " + applicant.get("last_name", "")
-        name = name.strip() or "Unknown"
-        answers = app.get("answers", {})
-        email = answers.get("email", applicant.get("username", "N/A"))
-        app_id = app.get("application_id", "N/A")
-        app_lang = "EN" if app.get("language") == "en" else "FA"
-        voice_status = "✅ Voice" if (app.get("voice_file_path") or app.get("voice_file_id")) else "⏭️ Skipped"
-        submitted_at = app.get("submitted_at", "")
-        try:
-            dt = datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
-            date_str = dt.strftime("%H:%M")
-        except:
-            date_str = "N/A"
-        recent_items.append(
-            GROUP_APPLICATION_ITEM[language].format(
-                name=name,
-                email=email,
-                application_id=app_id,
-                date=date_str,
-                language=app_lang,
-                voice_status=voice_status,
+        for app in recent_apps:
+            applicant = app.get("applicant", {})
+            name = applicant.get("first_name", "") + " " + applicant.get("last_name", "")
+            name = name.strip() or "Unknown"
+            answers = app.get("answers", {})
+            email = answers.get("email", applicant.get("username", "N/A"))
+            app_id = app.get("application_id", "N/A")
+            app_lang = "EN" if app.get("language") == "en" else "FA"
+            voice_status = "✅ Voice" if (app.get("voice_file_path") or app.get("voice_file_id")) else "⏭️ Skipped"
+            submitted_at = app.get("submitted_at", "")
+            try:
+                dt = datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
+                date_str = dt.strftime("%H:%M")
+            except:
+                date_str = "N/A"
+            recent_items.append(
+                GROUP_APPLICATION_ITEM[language].format(
+                    name=name,
+                    email=email,
+                    application_id=app_id,
+                    date=date_str,
+                    language=app_lang,
+                    voice_status=voice_status,
+                )
             )
-        )
         recent_list = "\n".join(recent_items)
     else:
         recent_list = "No applications today." if language == Language.EN else "هیچ درخواستی امروز نیست."
