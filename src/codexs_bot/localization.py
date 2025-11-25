@@ -724,29 +724,6 @@ CONTACT_DECISION_REMINDER = {
     Language.FA: "لطفاً دکمه بله یا خیر را بزنید تا بدانم باید پیام بگیرم یا خیر.",
 }
 
-CONTACT_MESSAGE_REVIEW = {
-    Language.EN: (
-        "<b>📝 Review Your Message</b>\n\n"
-        "{message}\n\n"
-        "Would you like to send this message or edit it?"
-    ),
-    Language.FA: (
-        "<b>📝 بررسی پیام شما</b>\n\n"
-        "{message}\n\n"
-        "مایلید این پیام را ارسال کنید یا ویرایش کنید؟"
-    ),
-}
-
-CONTACT_SEND_BUTTON = {
-    Language.EN: "✅ Send Message",
-    Language.FA: "✅ ارسال پیام",
-}
-
-CONTACT_EDIT_BUTTON = {
-    Language.EN: "✏️ Edit Message",
-    Language.FA: "✏️ ویرایش پیام",
-}
-
 FALLBACK_MESSAGE = {
     Language.EN: (
         "I couldn't understand that. Here are your options:\n\n"
@@ -870,6 +847,21 @@ VOICE_WAITING_REMINDER = {
 CONTACT_MESSAGE_PROMPT = {
     Language.EN: "Great — type your message. A human teammate will read it shortly.",
     Language.FA: "عالی، لطفاً پیام خود را بنویسید. یکی از اعضای تیم به‌زودی آن را می‌خواند.",
+}
+
+CONTACT_MESSAGE_REVIEW = {
+    Language.EN: "<b>Review your message:</b>\n\n<i>{message}</i>\n\nReady to send or want to edit?",
+    Language.FA: "<b>پیام خود را بازبینی کنید:</b>\n\n<i>{message}</i>\n\nآماده ارسال است یا می‌خواهید ویرایش کنید؟",
+}
+
+CONTACT_SEND_BUTTON = {
+    Language.EN: "✅ Send Message",
+    Language.FA: "✅ ارسال پیام",
+}
+
+CONTACT_EDIT_BUTTON = {
+    Language.EN: "✏️ Edit Message",
+    Language.FA: "✏️ ویرایش پیام",
 }
 
 VOICE_STATUS_LINE = {
@@ -1140,6 +1132,19 @@ ERROR_GROUP_NOTIFICATION_FAILED = {
 ERROR_GENERIC = {
     Language.EN: "⚠️ Something went wrong. Please try again or use /menu to return to the main menu.",
     Language.FA: "⚠️ مشکلی پیش آمد. لطفاً دوباره تلاش کنید یا از /menu برای بازگشت به منوی اصلی استفاده کنید.",
+}
+
+ERROR_APPLICATION_SAVE_FAILED = {
+    Language.EN: (
+        "❌ <b>Critical Error</b>\n\n"
+        "We encountered an error while saving your application (ID: {app_id}).\n\n"
+        "Your data has been preserved. Please try submitting again, or contact support if the problem persists."
+    ),
+    Language.FA: (
+        "❌ <b>خطای بحرانی</b>\n\n"
+        "هنگام ذخیره درخواست شما (شناسه: {app_id}) خطایی رخ داد.\n\n"
+        "اطلاعات شما حفظ شده است. لطفاً دوباره تلاش کنید یا در صورت ادامه مشکل با پشتیبانی تماس بگیرید."
+    ),
 }
 
 
