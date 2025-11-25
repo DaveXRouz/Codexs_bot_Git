@@ -998,6 +998,28 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     reply_markup=_keyboard_with_back(None, language),
                     parse_mode="HTML",
                 )
+            elif original_flow == Flow.CONTACT_MESSAGE:
+                session.flow = Flow.CONTACT_MESSAGE
+                if session.contact_review_pending:
+                    review_keyboard = ReplyKeyboardMarkup(
+                        [[CONTACT_SEND_BUTTON[language], CONTACT_EDIT_BUTTON[language]]],
+                        resize_keyboard=True,
+                    )
+                    await update.message.reply_text(
+                        CONTACT_MESSAGE_REVIEW[language].format(message=session.contact_message_draft or ""),
+                        reply_markup=review_keyboard,
+                        parse_mode="HTML",
+                    )
+                elif session.contact_pending:
+                    await update.message.reply_text(
+                        CONTACT_INFO[language],
+                        reply_markup=ReplyKeyboardMarkup(yes_no_keyboard(language), resize_keyboard=True),
+                    )
+                else:
+                    await update.message.reply_text(
+                        CONTACT_MESSAGE_PROMPT[language],
+                        reply_markup=_keyboard_with_back(None, language),
+                    )
             elif original_flow == Flow.CONFIRM:
                 # Resume at confirmation stage - check if user was in edit mode
                 session.flow = Flow.CONFIRM
@@ -1271,6 +1293,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                     CONTACT_SKIP[language],
                     reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
                 )
+                await _save_session(update, context, session)
                 return
             else:
                 # User sent text instead of Yes/No - show clarification
@@ -2077,6 +2100,7 @@ async def save_contact_message(
         CONTACT_THANKS[language],
         reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
     )
+    await _save_session(update, context, session)
 
 
 def _parse_number(text: str) -> Optional[int]:
