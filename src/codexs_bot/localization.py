@@ -17,9 +17,9 @@ LANGUAGE_BUTTONS: Dict[Language, str] = {
 }
 
 BILINGUAL_WELCOME = (
-    "Select your language to continue\n"
+    "Codexs · Choose your language\n"
     "─────────────────────────────\n"
-    "زبان خود را برای ادامه انتخاب کنید"
+    "Codexs · زبان خود را انتخاب کنید"
 )
 
 LANGUAGE_PROMPT = {
@@ -29,12 +29,12 @@ LANGUAGE_PROMPT = {
 
 WELCOME_MESSAGE = {
     Language.EN: (
-        "Welcome to <b>Codexs</b> — global automation studio.\n"
-        "Tell me what you'd like to do and I'll guide you."
+        "Welcome to <b>Codexs</b>, the automation studio for global teams.\n"
+        "Use the menu or tell me what you need and I’ll guide you there."
     ),
     Language.FA: (
-        "به <b>Codexs</b> خوش آمدید — استودیوی جهانی اتوماسیون.\n"
-        "بفرمایید به دنبال چه هستید تا راهنمایی‌تان کنم."
+        "به <b>Codexs</b> خوش آمدید؛ استودیوی اتوماسیون برای تیم‌های جهانی.\n"
+        "از منوی زیر استفاده کنید یا بگویید به چه چیزی نیاز دارید تا همان بخش را باز کنم."
     ),
 }
 
@@ -694,50 +694,50 @@ UPDATE_CARDS = {
 
 CONTACT_INFO = {
     Language.EN: (
-        "You can email contact@codexs.ai or visit https://codexs.ai.\n"
-        "Would you like to send a short message here?"
+        "You can always reach us via contact@codexs.ai or codexs.ai.\n"
+        "Would you like to leave a short note for the team here?"
     ),
     Language.FA: (
-        "می‌توانید به contact@codexs.ai ایمیل بزنید یا به https://codexs.ai سر بزنید.\n"
-        "مایلید همین‌جا پیام کوتاهی بگذارید؟"
+        "همیشه می‌توانید از طریق contact@codexs.ai یا codexs.ai با ما در تماس باشید.\n"
+        "مایلید همین‌جا یادداشت کوتاهی برای تیم بگذارید؟"
     ),
 }
 
 CONTACT_THANKS = {
     Language.EN: (
-        "✅ Message saved for the Codexs ops team.\n\n"
-        "We'll review your message and respond within <b>1-2 business days</b> via email or Telegram."
+        "✅ Your message is now with the Codexs ops team.\n\n"
+        "We’ll review it and reply within <b>1–2 business days</b> via email or Telegram."
     ),
     Language.FA: (
-        "✅ پیام شما برای تیم عملیات Codexs ثبت شد.\n\n"
-        "پیام شما را بررسی می‌کنیم و ظرف <b>۱ تا ۲ روز کاری</b> از طریق ایمیل یا تلگرام پاسخ می‌دهیم."
+        "✅ پیام شما به تیم عملیات Codexs رسید.\n\n"
+        "آن را بررسی می‌کنیم و ظرف <b>۱ تا ۲ روز کاری</b> از طریق ایمیل یا تلگرام پاسخ می‌دهیم."
     ),
 }
 
 CONTACT_SKIP = {
-    Language.EN: "No worries. Let me know if you need anything else.",
-    Language.FA: "اشکالی ندارد. اگر مورد دیگری بود حتماً بگویید.",
+    Language.EN: "Understood. If you need anything else, the menu is always open.",
+    Language.FA: "متوجه شدم. اگر به مورد دیگری نیاز داشتید، منو همیشه در دسترس است.",
 }
 
 CONTACT_DECISION_REMINDER = {
-    Language.EN: "Please tap Yes or No so I know whether to collect a message.",
-    Language.FA: "لطفاً دکمه بله یا خیر را بزنید تا بدانم باید پیام بگیرم یا خیر.",
+    Language.EN: "Please choose Yes or No so I know whether to open the contact form.",
+    Language.FA: "لطفاً بله یا خیر را انتخاب کنید تا بدانم باید فرم پیام را باز کنم یا خیر.",
 }
 
 FALLBACK_MESSAGE = {
     Language.EN: (
-        "I couldn't understand that. Here are your options:\n\n"
+        "I couldn’t match that input. Try one of these next steps:\n\n"
         "• Use the buttons below to navigate\n"
-        "• Type /menu to return to main menu\n"
-        "• Type /help for context-aware assistance\n"
-        "• Type /commands to see all available commands"
+        "• Type /menu to return to the main menu\n"
+        "• Type /help for guidance based on where you are\n"
+        "• Type /commands to see all shortcuts"
     ),
     Language.FA: (
-        "نتوانستم درخواست شما را درک کنم. گزینه‌های شما:\n\n"
+        "این ورودی را متوجه نشدم. یکی از مراحل زیر را امتحان کنید:\n\n"
         "• از دکمه‌های زیر برای ناوبری استفاده کنید\n"
-        "• /menu را بزنید تا به منوی اصلی برگردید\n"
-        "• /help را بزنید برای راهنمایی\n"
-        "• /commands را بزنید تا همه دستورات را ببینید"
+        "• ‎/menu‎ را بزنید تا به منوی اصلی برگردید\n"
+        "• ‎/help‎ را بزنید تا راهنمای متناسب با موقعیت فعلی را ببینید\n"
+        "• ‎/commands‎ را بزنید تا همه میانبرها نمایش داده شود"
     ),
 }
 
@@ -753,37 +753,37 @@ AI_RATE_LIMIT_MESSAGE = {
 
 HELP_TEXT_APPLY = {
     Language.EN: (
-        "You're in the <b>application flow</b>.\n\n"
-        "• Answer each question one by one\n"
-        "• Use buttons when available\n"
-        "• Voice recording is mandatory\n"
-        "• You can edit answers before submitting\n\n"
-        "Type /menu to cancel and return to main menu."
+        "You’re in the <b>Codexs application flow</b>.\n\n"
+        "• Answer each question in order\n"
+        "• Use on-screen buttons whenever they appear\n"
+        "• An English voice sample is required before submission\n"
+        "• You can review and edit everything at the end\n\n"
+        "Need to stop? Type /menu to cancel and return to the main menu."
     ),
     Language.FA: (
-        "شما در <b>فرم درخواست</b> هستید.\n\n"
-        "• به هر سؤال یکی یکی پاسخ دهید\n"
-        "• از دکمه‌ها استفاده کنید\n"
-        "• ضبط صدا اجباری است\n"
-        "• می‌توانید قبل از ارسال ویرایش کنید\n\n"
-        "دستور /menu را برای لغو و بازگشت به منوی اصلی بفرستید."
+        "شما در <b>فرآیند درخواست Codexs</b> هستید.\n\n"
+        "• به هر سؤال به ترتیب پاسخ دهید\n"
+        "• هر جا دکمه‌ای پیشنهاد شد از همان استفاده کنید\n"
+        "• نمونه صوتی انگلیسی پیش از ارسال نهایی الزامی است\n"
+        "• در پایان می‌توانید همه پاسخ‌ها را بازبینی و ویرایش کنید\n\n"
+        "اگر می‌خواهید متوقف شوید، ‎/menu‎ را بزنید تا درخواست لغو و به منوی اصلی برگردید."
     ),
 }
 
 HELP_TEXT_VOICE = {
     Language.EN: (
-        "You need to <b>record a voice message</b>.\n\n"
-        "• Read the English text provided\n"
-        "• Record 30-45 seconds\n"
-        "• Send as a voice message (not audio file)\n\n"
-        "This is mandatory to complete your application."
+        "To continue you need to <b>record a short English voice sample</b>.\n\n"
+        "• Read the text provided in the prompt\n"
+        "• Record for roughly 30–45 seconds\n"
+        "• Send it as a Telegram voice message (not an audio file)\n\n"
+        "It’s the final step before we review your application."
     ),
     Language.FA: (
-        "شما باید <b>یک پیام صوتی ضبط کنید</b>.\n\n"
-        "• متن انگلیسی ارائه شده را بخوانید\n"
-        "• ۳۰-۴۵ ثانیه ضبط کنید\n"
-        "• به عنوان پیام صوتی ارسال کنید (نه فایل صوتی)\n\n"
-        "این بخش برای تکمیل درخواست شما اجباری است."
+        "برای ادامه لازم است <b>نمونه صوتی کوتاه انگلیسی</b> ضبط کنید.\n\n"
+        "• متن نمایش داده شده در پیام را بخوانید\n"
+        "• حدود ۳۰ تا ۴۵ ثانیه ضبط کنید\n"
+        "• آن را به صورت پیام صوتی تلگرام (و نه فایل صوتی) ارسال کنید\n\n"
+        "این آخرین مرحله پیش از بررسی درخواست شماست."
     ),
 }
 
@@ -831,22 +831,22 @@ MISSING_ANSWER = {
 
 VOICE_WAITING_REMINDER = {
     Language.EN: (
-        "<b>⏳ Voice recording required</b>\n\n"
-        "Please record and send your English voice sample.\n"
-        "This is <b>mandatory</b> to complete your application.\n\n"
-        "Or tap ⬅️ Back to cancel and return to main menu."
+        "<b>⏳ Voice sample required</b>\n\n"
+        "Record and send the English script shown in the prompt.\n"
+        "We need this sample before we can review your application.\n\n"
+        "Need to exit? Tap ⬅️ Back to cancel and return to the main menu."
     ),
     Language.FA: (
-        "<b>⏳ ضبط صدا الزامی است</b>\n\n"
-        "لطفاً نمونه صوتی انگلیسی خود را ضبط و ارسال کنید.\n"
-        "این بخش برای تکمیل درخواست شما <b>اجباری</b> است.\n\n"
-        "یا روی ⬅️ بازگشت بزنید تا لغو کنید و به منوی اصلی برگردید."
+        "<b>⏳ نمونه صوتی لازم است</b>\n\n"
+        "متن انگلیسی نمایش داده شده را ضبط و ارسال کنید.\n"
+        "پیش از بررسی درخواست، به این نمونه نیاز داریم.\n\n"
+        "می‌خواهید خارج شوید؟ روی ⬅️ بازگشت بزنید تا لغو و به منوی اصلی برگردید."
     ),
 }
 
 CONTACT_MESSAGE_PROMPT = {
-    Language.EN: "Great — type your message. A human teammate will read it shortly.",
-    Language.FA: "عالی، لطفاً پیام خود را بنویسید. یکی از اعضای تیم به‌زودی آن را می‌خواند.",
+    Language.EN: "Great. Share your message below and a Codexs teammate will review it shortly.",
+    Language.FA: "عالی است. پیام خود را در ادامه بنویسید تا یکی از اعضای تیم Codexs به‌زودی آن را بررسی کند.",
 }
 
 CONTACT_MESSAGE_REVIEW = {
@@ -885,20 +885,20 @@ VOICE_STATUS_SKIPPED = {
 
 HELP_TEXT = {
     Language.EN: (
-        "I can help you:\n"
-        "• Apply for Codexs roles\n"
-        "• Learn about the studio\n"
-        "• Read updates & news\n"
-        "• Send a contact message\n\n"
-        "Commands: /start · /menu · /help · /commands"
+        "Here’s what I can do for you at Codexs:\n"
+        "• Start or resume the hiring application\n"
+        "• Share what the studio is building right now\n"
+        "• Post the latest updates and launches\n"
+        "• Relay a message directly to the team\n\n"
+        "Quick commands: /start · /menu · /help · /commands"
     ),
     Language.FA: (
-        "می‌توانم کمک کنم:\n"
-        "• ارسال درخواست همکاری Codexs\n"
-        "• آشنایی با استودیو\n"
-        "• دیدن خبرها و به‌روزرسانی‌ها\n"
-        "• ارسال پیام برای تیم\n\n"
-        "دستورات: ‎/start · ‎/menu · ‎/help · ‎/commands"
+        "در Codexs می‌توانم برایتان انجام دهم:\n"
+        "• آغاز یا ادامه فرآیند درخواست همکاری\n"
+        "• معرفی آنچه استودیو هم‌اکنون می‌سازد\n"
+        "• نمایش تازه‌ترین به‌روزرسانی‌ها و لانچ‌ها\n"
+        "• ارسال مستقیم پیام به تیم\n\n"
+        "دستورات سریع: ‎/start · ‎/menu · ‎/help · ‎/commands"
     ),
 }
 
