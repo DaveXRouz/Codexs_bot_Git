@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import html
 import json
 import logging
@@ -141,6 +142,8 @@ from .localization import (
 from .session import Flow, UserSession, get_session
 from .storage import DataStorage
 from .notifications import WebhookNotifier
+from .supabase_client import SupabaseBotClient
+from .conversation_logger import init_conversation_logger, capture_incoming
 
 
 logger = logging.getLogger(__name__)
@@ -187,6 +190,14 @@ _REPEAT_COMMANDS = {
 _QUESTION_KEYWORDS = {
     Language.EN: {"what", "why", "how", "help", "where", "who"},
     Language.FA: {"چی", "چطور", "چرا", "کمک", "کجا", "کی"},
+}
+
+_STAGE_LABELS = {
+    "new": ("🆕 New", "🆕 درخواست جدید"),
+    "review": ("🔍 In review", "🔍 در حال بررسی"),
+    "interview": ("📞 Interview", "📞 هماهنگی مصاحبه"),
+    "hired": ("✅ Hired", "✅ تایید شده"),
+    "rejected": ("⚠️ Closed", "⚠️ بسته شده"),
 }
 
 _VIDEO_EXTENSIONS = {".mp4", ".mov", ".m4v", ".webm"}
@@ -323,6 +334,11 @@ def _keyboard_with_back(
     rows = [list(row) for row in base_rows] if base_rows else []
     rows.append([BACK_TO_MENU[language]])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=one_time)
+
+
+async def handle_conversation_logging(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Capture all inbound user messages for Supabase logging."""
+    await capture_incoming(update)
 
 
 def _language_keyboard() -> ReplyKeyboardMarkup:
@@ -566,6 +582,10 @@ def _get_contact_notifier(context: ContextTypes.DEFAULT_TYPE) -> WebhookNotifier
 
 def _get_ai_responder(context: ContextTypes.DEFAULT_TYPE) -> Optional[OpenAIFallback]:
     return context.application.bot_data.get("ai_responder")  # type: ignore[return-value]
+
+
+def _get_supabase_client(context: ContextTypes.DEFAULT_TYPE) -> Optional[SupabaseBotClient]:
+    return context.application.bot_data.get("supabase_client")  # type: ignore[return-value]
 
 
 def _is_group_chat(update: Update) -> bool:
@@ -1976,6 +1996,14 @@ async def finalize_application(update: Update, context: ContextTypes.DEFAULT_TYP
         # Don't clear session - user can try again
         return
     
+    voice_file_url: Optional[str] = None
+    if session.voice_file_id:
+        try:
+            telegram_file = await context.bot.get_file(session.voice_file_id)
+            voice_file_url = telegram_file.file_path
+        except TelegramError as exc:
+            logger.warning("Unable to fetch Telegram voice file URL: %s", exc)
+
     notifier = _get_application_notifier(context)
     await notifier.post(
         {
@@ -1989,6 +2017,7 @@ async def finalize_application(update: Update, context: ContextTypes.DEFAULT_TYP
             "portfolio": session.answers.get("portfolio"),
             "voice_file_path": session.voice_file_path,
             "voice_file_id": session.voice_file_id,
+             "voice_file_url": voice_file_url,
             "voice_skipped": session.voice_skipped,
             "telegram_id": applicant["telegram_id"],
             "telegram_username": applicant["username"],
@@ -2506,6 +2535,68 @@ async def handle_admin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
                 f"❌ Error: {str(e)}\n\nPlease check bot logs.",
                 parse_mode="HTML",
             )
+
+
+async def handle_user_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Allow applicants to check their Supabase status via /status."""
+    if not update.message or not update.effective_user:
+        return
+    supabase_client = _get_supabase_client(context)
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+
+    if not supabase_client or not supabase_client.enabled:
+        await update.message.reply_text(
+            "📡 Status tracking isn't enabled yet. Please try again later."
+            if language == Language.EN
+            else "📡 پیگیری وضعیت هنوز فعال نشده است. لطفاً بعداً دوباره امتحان کنید.",
+            parse_mode="HTML",
+        )
+        return
+
+    status_payload = await supabase_client.fetch_applicant_status(update.effective_user.id)
+    if not status_payload or status_payload.get("status") in {None, "unknown"}:
+        await update.message.reply_text(
+            "I couldn't find an application linked to this Telegram account. "
+            "Submit a new application from the main menu."
+            if language == Language.EN
+            else "درخواستی مرتبط با این حساب تلگرام پیدا نشد. از منوی اصلی می‌توانید درخواست جدید ارسال کنید.",
+            parse_mode="HTML",
+        )
+        return
+
+    stage_key = status_payload.get("status", "review")
+    stage_label_en, stage_label_fa = _STAGE_LABELS.get(stage_key, ("⏳ In review", "⏳ در حال بررسی"))
+    stage_label = stage_label_en if language == Language.EN else stage_label_fa
+    submitted_at = status_payload.get("submitted_at")
+    earliest_start = status_payload.get("earliest_start")
+    working_hours = status_payload.get("working_hours")
+
+    lines = [
+        "📊 <b>Application Status</b>" if language == Language.EN else "📊 <b>وضعیت درخواست</b>",
+        "",
+        f"{'Status' if language == Language.EN else 'وضعیت'}: {stage_label}",
+    ]
+    if submitted_at:
+        lines.append(
+            f"{'Submitted' if language == Language.EN else 'ارسال شده'}: {submitted_at}"
+        )
+    if earliest_start:
+        lines.append(
+            f"{'Earliest start' if language == Language.EN else 'شروع پیشنهادی'}: {earliest_start}"
+        )
+    if working_hours:
+        lines.append(
+            f"{'Preferred hours' if language == Language.EN else 'ساعات ترجیحی'}: {working_hours}"
+        )
+    lines.append("")
+    lines.append(
+        "We'll reach out inside Telegram once the next step is ready."
+        if language == Language.EN
+        else "به محض آماده شدن مرحله بعدی از طریق تلگرام با شما تماس می‌گیریم."
+    )
+
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
 
 
 async def handle_admin_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -3117,6 +3208,43 @@ async def handle_admin_cleanup(update: Update, context: ContextTypes.DEFAULT_TYP
         )
 
 
+async def handle_admin_reload_config(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Force-refresh remote question/content config from Supabase."""
+    if not await _require_admin(update, context) or not update.message:
+        return
+    supabase_client = _get_supabase_client(context)
+    session = get_session(context.user_data)
+    language = session.language or Language.EN
+
+    if not supabase_client or not supabase_client.enabled:
+        await update.message.reply_text(
+            "Supabase integration is not configured." if language == Language.EN else "اتصال Supabase پیکربندی نشده است.",
+            parse_mode="HTML",
+        )
+        return
+
+    await update.message.reply_text(
+        "Refreshing remote configuration…" if language == Language.EN else "در حال به‌روزرسانی تنظیمات…",
+        parse_mode="HTML",
+    )
+
+    success = await supabase_client.refresh_remote_content()
+    if success:
+        await update.message.reply_text(
+            "✅ Remote questions and content updated."
+            if language == Language.EN
+            else "✅ سوالات و محتوا با موفقیت به‌روزرسانی شد.",
+            parse_mode="HTML",
+        )
+    else:
+        await update.message.reply_text(
+            "⚠️ Failed to fetch config. Check logs."
+            if language == Language.EN
+            else "⚠️ دریافت تنظیمات با خطا مواجه شد. لاگ‌ها را بررسی کنید.",
+            parse_mode="HTML",
+        )
+
+
 async def handle_admin_sessions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """List all active sessions."""
     if not await _require_admin(update, context) or not update.message:
@@ -3178,6 +3306,13 @@ def main() -> None:
     settings = load_settings()
     storage = DataStorage(settings.applications_file, settings.contact_file, settings.sessions_dir)
 
+    supabase_client = SupabaseBotClient(settings)
+    if supabase_client.enabled:
+        try:
+            asyncio.run(supabase_client.refresh_remote_content())
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Failed to bootstrap remote config: %s", exc)
+
     application = Application.builder().token(settings.bot_token).build()
     application.bot_data["storage"] = storage
     application.bot_data["settings"] = settings
@@ -3196,19 +3331,26 @@ def main() -> None:
         settings.openai_api_key,
         settings.openai_model,
     )
+    application.bot_data["supabase_client"] = supabase_client
+    init_conversation_logger(supabase_client if supabase_client.enabled else None)
 
+    # Log every incoming update (group -1 ensures it's first)
+    application.add_handler(MessageHandler(filters.ALL, handle_conversation_logging), group=-1)
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("menu", menu_command))
     application.add_handler(CommandHandler("help", handle_help))
     application.add_handler(CommandHandler("commands", handle_commands))
+    application.add_handler(CommandHandler("status", handle_user_status))
+    application.add_handler(CommandHandler("botstatus", handle_admin_status))
+    application.add_handler(CommandHandler("adminstatus", handle_admin_status))
     # Admin commands
     application.add_handler(CommandHandler("testadmin", handle_test_admin))
     application.add_handler(CommandHandler("admin", handle_admin))
-    application.add_handler(CommandHandler("status", handle_admin_status))
     application.add_handler(CommandHandler("stats", handle_admin_stats))
     application.add_handler(CommandHandler("debug", handle_admin_debug))
     application.add_handler(CommandHandler("sessions", handle_admin_sessions))
     application.add_handler(CommandHandler("cleanup", handle_admin_cleanup))
+    application.add_handler(CommandHandler("reloadconfig", handle_admin_reload_config))
     application.add_handler(CommandHandler("testgroup", handle_admin_test_group))
     # Group commands (work in both private and group chats, but require admin in groups)
     application.add_handler(CommandHandler("daily", handle_group_daily_report))

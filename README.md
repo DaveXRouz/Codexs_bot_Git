@@ -77,6 +77,10 @@ GROUP_CHAT_ID=-1001234567890
 ENABLE_MEDIA=true
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
+BOT_CONFIG_URL=https://<supabase-project>.functions.supabase.co/bot-config
+BOT_STATUS_URL=https://<supabase-project>.functions.supabase.co/bot-status
+BOT_LOG_URL=https://<supabase-project>.functions.supabase.co/bot-log
+BOT_API_KEY=shared_secret_from_supabase
 ```
 
 `OPENAI_API_KEY` is optional—add it to enable the conversational fallback powered by OpenAI (defaults to disabled). Leave `OPENAI_MODEL` empty to use the default `gpt-4o-mini` or point it to any compatible chat-completions model.

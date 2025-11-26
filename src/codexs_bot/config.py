@@ -28,6 +28,10 @@ class Settings:
     openai_api_key: Optional[str]
     openai_model: str
     admin_user_ids: List[int]
+    bot_config_url: Optional[str]
+    bot_status_url: Optional[str]
+    bot_log_url: Optional[str]
+    bot_api_key: Optional[str]
 
 
 def load_settings() -> Settings:
@@ -87,6 +91,10 @@ def load_settings() -> Settings:
             logger.warning(f"Invalid GROUP_CHAT_ID: {group_chat_id}. Must be an integer.")
     openai_api_key = os.getenv("OPENAI_API_KEY")
     openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    bot_config_url = os.getenv("BOT_CONFIG_URL")
+    bot_status_url = os.getenv("BOT_STATUS_URL")
+    bot_log_url = os.getenv("BOT_LOG_URL")
+    bot_api_key = os.getenv("BOT_API_KEY")
     
     # Load admin user IDs (comma-separated)
     admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
@@ -116,5 +124,9 @@ def load_settings() -> Settings:
         openai_api_key=openai_api_key,
         openai_model=openai_model,
         admin_user_ids=admin_user_ids,
+        bot_config_url=bot_config_url,
+        bot_status_url=bot_status_url,
+        bot_log_url=bot_log_url,
+        bot_api_key=bot_api_key,
     )
 

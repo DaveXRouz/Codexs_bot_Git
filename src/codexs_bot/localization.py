@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from copy import deepcopy
 import re
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class Language(Enum):
@@ -253,7 +254,7 @@ class Question:
     input_type: str = "text"  # "text", "contact", "location"
 
 
-HIRING_QUESTIONS: List[Question] = [
+_DEFAULT_HIRING_QUESTIONS: List[Question] = [
     Question(
         key="full_name",
         prompts={
@@ -394,6 +395,10 @@ HIRING_QUESTIONS: List[Question] = [
         optional=True,
     ),
 ]
+
+# Active question list that can be overridden at runtime
+HIRING_QUESTIONS: List[Question] = deepcopy(_DEFAULT_HIRING_QUESTIONS)
+_QUESTION_TEMPLATE_MAP: Dict[str, Question] = {question.key: question for question in _DEFAULT_HIRING_QUESTIONS}
 
 HIRING_INTRO = {
     Language.EN: (
@@ -691,6 +696,129 @@ UPDATE_CARDS = {
         },
     ],
 }
+
+
+def reset_hiring_questions() -> None:
+    """Restore the default hiring question set."""
+    HIRING_QUESTIONS.clear()
+    HIRING_QUESTIONS.extend(deepcopy(_DEFAULT_HIRING_QUESTIONS))
+
+
+def _build_prompt_with_description(
+    base_prompt_en: str,
+    base_prompt_fa: str,
+    description: Optional[str],
+) -> Dict[Language, str]:
+    if not description:
+        return {
+            Language.EN: base_prompt_en,
+            Language.FA: base_prompt_fa,
+        }
+    suffix = f"\n\n<i>{description}</i>"
+    return {
+        Language.EN: base_prompt_en + suffix,
+        Language.FA: base_prompt_fa + suffix,
+    }
+
+
+def apply_remote_questions(remote_questions: List[Dict[str, Any]]) -> None:
+    """Override hiring questions using values fetched from Supabase."""
+    if not remote_questions:
+        return
+
+    new_questions: List[Question] = []
+    seen_keys: set[str] = set()
+
+    for entry in sorted(remote_questions, key=lambda item: item.get("order_index", 0)):
+        key = entry.get("question_key")
+        if not key:
+            continue
+
+        template = _QUESTION_TEMPLATE_MAP.get(key)
+        required = entry.get("required")
+        optional_override = None if required is None else not bool(required)
+        en_text = entry.get("en_text")
+        fa_text = entry.get("fa_text")
+        description = entry.get("description")
+
+        if template:
+            prompts = _build_prompt_with_description(
+                en_text or template.prompts[Language.EN],
+                fa_text or template.prompts[Language.FA],
+                description,
+            )
+            question = Question(
+                key=key,
+                prompts=prompts,
+                summary_labels=template.summary_labels,
+                keyboard=template.keyboard,
+                optional=template.optional if optional_override is None else optional_override,
+                input_type=template.input_type,
+            )
+        else:
+            fallback_label = key.replace("_", " ").title()
+            prompts = _build_prompt_with_description(
+                en_text or fallback_label,
+                fa_text or en_text or fallback_label,
+                description,
+            )
+            question = Question(
+                key=key,
+                prompts=prompts,
+                summary_labels={
+                    Language.EN: fallback_label,
+                    Language.FA: fallback_label,
+                },
+                optional=optional_override if optional_override is not None else False,
+            )
+
+        new_questions.append(question)
+        seen_keys.add(key)
+
+    # Keep any defaults that weren't overridden to preserve workflow
+    for template in _DEFAULT_HIRING_QUESTIONS:
+        if template.key not in seen_keys:
+            new_questions.append(template)
+
+    HIRING_QUESTIONS.clear()
+    HIRING_QUESTIONS.extend(new_questions)
+
+
+def _split_content_block(text: Optional[str]) -> Optional[List[str]]:
+    if not text:
+        return None
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return lines or None
+
+
+def apply_remote_content_blocks(content_blocks: Dict[str, Dict[str, Optional[str]]]) -> None:
+    """Override About/Updates/Help content from Supabase."""
+    if not content_blocks:
+        return
+
+    for slug, data in content_blocks.items():
+        if not isinstance(data, dict):
+            continue
+        en_body = data.get("en_body")
+        fa_body = data.get("fa_body")
+
+        if slug == "about":
+            if en_body:
+                ABOUT_TEXT[Language.EN] = en_body
+            if fa_body:
+                ABOUT_TEXT[Language.FA] = fa_body
+        elif slug == "updates":
+            en_lines = _split_content_block(en_body)
+            fa_lines = _split_content_block(fa_body)
+            if en_lines:
+                UPDATES[Language.EN] = en_lines
+            if fa_lines:
+                UPDATES[Language.FA] = fa_lines
+        elif slug == "help":
+            if en_body:
+                HELP_TEXT[Language.EN] = en_body
+            if fa_body:
+                HELP_TEXT[Language.FA] = fa_body
 
 CONTACT_INFO = {
     Language.EN: (
