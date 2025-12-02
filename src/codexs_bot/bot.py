@@ -2003,7 +2003,7 @@ async def finalize_application(update: Update, context: ContextTypes.DEFAULT_TYP
             voice_file_url = telegram_file.file_path
         except TelegramError as exc:
             logger.warning("Unable to fetch Telegram voice file URL: %s", exc)
-
+    
     notifier = _get_application_notifier(context)
     await notifier.post(
         {
