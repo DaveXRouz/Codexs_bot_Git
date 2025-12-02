@@ -142,7 +142,7 @@ from .localization import (
 from .session import Flow, UserSession, get_session
 from .storage import DataStorage
 from .notifications import WebhookNotifier
-from .supabase_client import SupabaseBotClient
+from .supabase_client import SUPABASE_ANON_KEY, SupabaseBotClient
 from .conversation_logger import init_conversation_logger, capture_incoming
 from .remote_config import default_menu_rows, remote_config
 
