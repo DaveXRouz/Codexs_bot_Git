@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import httpx
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.constants import ChatType
 from telegram.error import TelegramError
@@ -352,6 +353,91 @@ async def _send_remote_content(
         return False
     await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
     return True
+
+
+async def poll_outbound_messages(application: Application) -> None:
+    """Poll Supabase for pending outbound messages and deliver them via Telegram."""
+    settings = application.bot_data.get("settings")
+    if not settings:
+        logger.debug("Outbound poll skipped - settings not initialized yet")
+        return
+
+    supabase_url = getattr(settings, "supabase_url", None)
+    bot_api_key = getattr(settings, "bot_api_key", None)
+
+    if not supabase_url or not bot_api_key:
+        logger.debug("Outbound poll skipped - Supabase URL or BOT_API_KEY not configured")
+        return
+
+    endpoint = f"{supabase_url}/functions/v1/bot-outbound"
+    ack_endpoint = f"{endpoint}/ack"
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(
+                endpoint,
+                headers={
+                    "Authorization": f"Bearer {SUPABASE_ANON_KEY}" if SUPABASE_ANON_KEY else "",
+                    "x-bot-key": bot_api_key,
+                    "Content-Type": "application/json",
+                },
+            )
+            if response.status_code != 200:
+                logger.error("Failed to fetch outbound messages: HTTP %s", response.status_code)
+                return
+
+            payload = response.json()
+            messages = payload.get("messages", []) or []
+
+            if not messages:
+                return
+
+            logger.info("📤 Found %d pending outbound messages", len(messages))
+
+            for message in messages:
+                msg_id = message.get("id")
+                telegram_user_id = message.get("telegram_user_id")
+                text = message.get("message_text")
+                message_type = message.get("message_type", "text")
+
+                if not msg_id or not telegram_user_id or not text:
+                    logger.warning("Skipping outbound message with missing fields: %s", message)
+                    continue
+
+                status = "sent"
+                try:
+                    if message_type == "text":
+                        await application.bot.send_message(chat_id=int(telegram_user_id), text=text)
+                    else:
+                        await application.bot.send_message(chat_id=int(telegram_user_id), text=text)
+                    logger.info("✅ Sent outbound message %s to user %s", msg_id, telegram_user_id)
+                except Exception as exc:  # pylint: disable=broad-except
+                    status = "failed"
+                    logger.error("❌ Failed to send outbound message %s: %s", msg_id, exc)
+
+                try:
+                    await client.post(
+                        ack_endpoint,
+                        headers={
+                            "Authorization": f"Bearer {SUPABASE_ANON_KEY}" if SUPABASE_ANON_KEY else "",
+                            "x-bot-key": bot_api_key,
+                            "Content-Type": "application/json",
+                        },
+                        json={"message_id": msg_id, "status": status},
+                    )
+                except Exception as exc:  # pylint: disable=broad-except
+                    logger.error("Failed to acknowledge outbound message %s: %s", msg_id, exc)
+
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error("Error polling outbound messages: %s", exc)
+
+
+async def _outbound_poll_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """JobQueue wrapper to call outbound polling with access to the application instance."""
+    try:
+        await poll_outbound_messages(context.application)
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.error("Outbound polling job failed: %s", exc)
 
 
 async def _start_application_flow(
@@ -3754,9 +3840,17 @@ def main() -> None:
             first=300,  # First run after 5 minutes
             name="config_refresh",
         )
+        application.job_queue.run_repeating(
+            _outbound_poll_job,
+            interval=30,
+            first=30,
+            name="outbound_poll",
+        )
         logger.info("Scheduled periodic config refresh every 5 minutes")
+        logger.info("Scheduled outbound message polling every 30 seconds")
     elif supabase_client.enabled:
         logger.warning("JobQueue not available - periodic config refresh disabled")
+        logger.warning("JobQueue not available - outbound message polling disabled")
 
     # Log every incoming update (group -1 ensures it's first)
     application.add_handler(MessageHandler(filters.ALL, handle_conversation_logging), group=-1)
