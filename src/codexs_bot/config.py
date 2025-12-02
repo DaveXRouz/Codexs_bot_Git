@@ -11,6 +11,19 @@ from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
 
 
+def _sanitize_secret(value: Optional[str], label: str) -> Optional[str]:
+    """Trim whitespace/non-printables and strip accidental leading '='."""
+    if not value:
+        return None
+    cleaned = "".join(ch for ch in value if ch.isprintable()).strip()
+    if cleaned != value:
+        logger.warning("%s contained whitespace or non-printable chars. Sanitizing.", label)
+    if cleaned.startswith("="):
+        logger.warning("%s started with '='. Removing leading '='.", label)
+        cleaned = cleaned.lstrip("=")
+    return cleaned or None
+
+
 @dataclass(slots=True)
 class Settings:
     bot_token: str
@@ -98,12 +111,12 @@ def load_settings() -> Settings:
     bot_config_url = os.getenv("BOT_CONFIG_URL")
     bot_status_url = os.getenv("BOT_STATUS_URL")
     bot_log_url = os.getenv("BOT_LOG_URL")
-    bot_api_key = os.getenv("BOT_API_KEY")
+    bot_api_key = _sanitize_secret(os.getenv("BOT_API_KEY"), "BOT_API_KEY")
+    bot_webhook_secret = _sanitize_secret(os.getenv("BOT_WEBHOOK_SECRET"), "BOT_WEBHOOK_SECRET")
     
     # Supabase integration
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
-    bot_webhook_secret = os.getenv("BOT_WEBHOOK_SECRET")
     
     # Auto-construct Supabase Edge Function URLs if SUPABASE_URL is set
     if supabase_url and not bot_config_url:

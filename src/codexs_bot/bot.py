@@ -3384,18 +3384,14 @@ async def _refresh_config_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             logger.warning("Periodic config refresh failed: %s", exc)
 
 
-def main() -> None:
-    logging.basicConfig(
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        level=logging.INFO,
-    )
+async def _run_bot() -> None:
     settings = load_settings()
     storage = DataStorage(settings.applications_file, settings.contact_file, settings.sessions_dir)
 
     supabase_client = SupabaseBotClient(settings)
     if supabase_client.enabled:
         try:
-            asyncio.run(supabase_client.refresh_remote_content())
+            await supabase_client.refresh_remote_content()
             logger.info("Initial remote config loaded from Supabase")
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("Failed to bootstrap remote config: %s", exc)
@@ -3479,7 +3475,23 @@ def main() -> None:
     else:
         logger.info("📴 Supabase integration not configured (local storage only)")
     
-    application.run_polling()
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    try:
+        await application.updater.idle()
+    finally:
+        await application.updater.stop()
+        await application.stop()
+        await application.shutdown()
+
+
+def main() -> None:
+    logging.basicConfig(
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        level=logging.INFO,
+    )
+    asyncio.run(_run_bot())
 
 
 if __name__ == "__main__":
