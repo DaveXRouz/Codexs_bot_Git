@@ -51,14 +51,20 @@ class SupabaseBotClient:
         return bool(self._supabase_url and self._api_key)
 
     def _headers(self) -> Dict[str, str]:
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+        }
         if self._api_key:
             headers["x-bot-key"] = self._api_key
         return headers
 
     def _application_headers(self) -> Dict[str, str]:
         """Headers for application submission (standardized to x-bot-key)."""
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+        }
         if self._api_key:
             headers["x-bot-key"] = self._api_key
         return headers
