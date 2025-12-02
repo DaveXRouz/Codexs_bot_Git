@@ -27,7 +27,7 @@ class SupabaseBotClient:
         self._config_url = settings.bot_config_url
         self._status_url = settings.bot_status_url
         self._log_url = settings.bot_log_url
-        self._api_key = settings.bot_api_key
+        self._api_key = settings.supabase_bot_key
         self._webhook_secret = settings.bot_webhook_secret or settings.bot_api_key
         
         # Construct application submission URL

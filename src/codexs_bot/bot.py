@@ -3384,17 +3384,25 @@ async def _refresh_config_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             logger.warning("Periodic config refresh failed: %s", exc)
 
 
-async def _run_bot() -> None:
+def main() -> None:
+    logging.basicConfig(
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        level=logging.INFO,
+    )
     settings = load_settings()
     storage = DataStorage(settings.applications_file, settings.contact_file, settings.sessions_dir)
 
     supabase_client = SupabaseBotClient(settings)
     if supabase_client.enabled:
         try:
-            await supabase_client.refresh_remote_content()
+            asyncio.run(supabase_client.refresh_remote_content())
             logger.info("Initial remote config loaded from Supabase")
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("Failed to bootstrap remote config: %s", exc)
+
+    # Ensure there's an event loop for PTB when running under Python 3.12+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
     application = Application.builder().token(settings.bot_token).build()
     application.bot_data["storage"] = storage
@@ -3475,23 +3483,7 @@ async def _run_bot() -> None:
     else:
         logger.info("📴 Supabase integration not configured (local storage only)")
     
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling()
-    try:
-        await application.updater.idle()
-    finally:
-        await application.updater.stop()
-        await application.stop()
-        await application.shutdown()
-
-
-def main() -> None:
-    logging.basicConfig(
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        level=logging.INFO,
-    )
-    asyncio.run(_run_bot())
+    application.run_polling()
 
 
 if __name__ == "__main__":

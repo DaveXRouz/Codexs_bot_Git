@@ -45,6 +45,7 @@ class Settings:
     bot_status_url: Optional[str]
     bot_log_url: Optional[str]
     bot_api_key: Optional[str]
+    supabase_bot_key: Optional[str]
     # Supabase integration
     supabase_url: Optional[str]
     supabase_anon_key: Optional[str]
@@ -113,6 +114,9 @@ def load_settings() -> Settings:
     bot_log_url = os.getenv("BOT_LOG_URL")
     bot_api_key = _sanitize_secret(os.getenv("BOT_API_KEY"), "BOT_API_KEY")
     bot_webhook_secret = _sanitize_secret(os.getenv("BOT_WEBHOOK_SECRET"), "BOT_WEBHOOK_SECRET")
+    supabase_bot_key = _sanitize_secret(os.getenv("SUPABASE_BOT_KEY"), "SUPABASE_BOT_KEY")
+    if not supabase_bot_key:
+        supabase_bot_key = bot_api_key
     
     # Supabase integration
     supabase_url = os.getenv("SUPABASE_URL")
@@ -158,6 +162,7 @@ def load_settings() -> Settings:
         bot_status_url=bot_status_url,
         bot_log_url=bot_log_url,
         bot_api_key=bot_api_key,
+        supabase_bot_key=supabase_bot_key,
         supabase_url=supabase_url,
         supabase_anon_key=supabase_anon_key,
         bot_webhook_secret=bot_webhook_secret,
