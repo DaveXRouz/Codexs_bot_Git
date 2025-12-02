@@ -3422,7 +3422,7 @@ def main() -> None:
     init_conversation_logger(supabase_client if supabase_client.enabled else None)
 
     # Schedule periodic config refresh every 5 minutes if Supabase is enabled
-    if supabase_client.enabled:
+    if supabase_client.enabled and application.job_queue:
         application.job_queue.run_repeating(
             _refresh_config_job,
             interval=300,  # 5 minutes
@@ -3430,6 +3430,8 @@ def main() -> None:
             name="config_refresh",
         )
         logger.info("Scheduled periodic config refresh every 5 minutes")
+    elif supabase_client.enabled:
+        logger.warning("JobQueue not available - periodic config refresh disabled")
 
     # Log every incoming update (group -1 ensures it's first)
     application.add_handler(MessageHandler(filters.ALL, handle_conversation_logging), group=-1)
