@@ -32,6 +32,10 @@ class Settings:
     bot_status_url: Optional[str]
     bot_log_url: Optional[str]
     bot_api_key: Optional[str]
+    # Supabase integration
+    supabase_url: Optional[str]
+    supabase_anon_key: Optional[str]
+    bot_webhook_secret: Optional[str]
 
 
 def load_settings() -> Settings:
@@ -96,6 +100,19 @@ def load_settings() -> Settings:
     bot_log_url = os.getenv("BOT_LOG_URL")
     bot_api_key = os.getenv("BOT_API_KEY")
     
+    # Supabase integration
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
+    bot_webhook_secret = os.getenv("BOT_WEBHOOK_SECRET")
+    
+    # Auto-construct Supabase Edge Function URLs if SUPABASE_URL is set
+    if supabase_url and not bot_config_url:
+        bot_config_url = f"{supabase_url}/functions/v1/bot-config"
+    if supabase_url and not bot_status_url:
+        bot_status_url = f"{supabase_url}/functions/v1/bot-status"
+    if supabase_url and not bot_log_url:
+        bot_log_url = f"{supabase_url}/functions/v1/bot-log"
+    
     # Load admin user IDs (comma-separated)
     admin_ids_str = os.getenv("ADMIN_USER_IDS", "")
     admin_user_ids: List[int] = []
@@ -128,5 +145,8 @@ def load_settings() -> Settings:
         bot_status_url=bot_status_url,
         bot_log_url=bot_log_url,
         bot_api_key=bot_api_key,
+        supabase_url=supabase_url,
+        supabase_anon_key=supabase_anon_key,
+        bot_webhook_secret=bot_webhook_secret,
     )
 

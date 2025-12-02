@@ -2004,11 +2004,52 @@ async def finalize_application(update: Update, context: ContextTypes.DEFAULT_TYP
         except TelegramError as exc:
             logger.warning("Unable to fetch Telegram voice file URL: %s", exc)
     
+    submitted_at = datetime.now(timezone.utc).isoformat()
+    
+    # Submit to Supabase Edge Function (if configured)
+    supabase_client = _get_supabase_client(context)
+    if supabase_client and supabase_client.supabase_enabled:
+        supabase_payload = {
+            "telegram_user_id": str(applicant["telegram_id"]),
+            "username": applicant.get("username"),
+            "full_name": session.answers.get("full_name"),
+            "email": session.answers.get("email"),
+            "phone": session.answers.get("contact"),
+            "role_focus": session.answers.get("role_category"),
+            "location": session.answers.get("location"),
+            "skills": session.answers.get("skills"),
+            "experience": session.answers.get("experience"),
+            "portfolio_url": session.answers.get("portfolio"),
+            "motivation": session.answers.get("motivation"),
+            "salary_expectations": session.answers.get("salary"),
+            "earliest_start": session.answers.get("start_date"),
+            "working_hours": session.answers.get("working_hours"),
+            "answers": session.answers,
+            "application_id": application_id,
+            "submitted_at": submitted_at,
+            "language": language.value,
+        }
+        # Add voice sample info if available
+        if voice_file_url or session.voice_file_id:
+            supabase_payload["voice_sample"] = {
+                "file_url": voice_file_url,
+                "file_id": session.voice_file_id,
+                "file_name": f"{applicant['telegram_id']}_voice.ogg",
+                "content_type": "audio/ogg",
+            }
+        
+        result = await supabase_client.submit_application(supabase_payload)
+        if result:
+            logger.info(f"Application {application_id} submitted to Supabase: {result.get('applicant_id')}")
+        else:
+            logger.warning(f"Application {application_id} failed to submit to Supabase (will retry later)")
+    
+    # Send to webhook notifier (legacy)
     notifier = _get_application_notifier(context)
     await notifier.post(
         {
             "application_id": application_id,
-            "submitted_at": datetime.now(timezone.utc).isoformat(),
+            "submitted_at": submitted_at,
             "language": language.value,
             "answers": session.answers,
             "full_name": session.answers.get("full_name"),
@@ -2017,7 +2058,7 @@ async def finalize_application(update: Update, context: ContextTypes.DEFAULT_TYP
             "portfolio": session.answers.get("portfolio"),
             "voice_file_path": session.voice_file_path,
             "voice_file_id": session.voice_file_id,
-             "voice_file_url": voice_file_url,
+            "voice_file_url": voice_file_url,
             "voice_skipped": session.voice_skipped,
             "telegram_id": applicant["telegram_id"],
             "telegram_username": applicant["username"],
@@ -2600,7 +2641,7 @@ async def handle_user_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def handle_admin_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Show bot status."""
+    """Show bot status including Supabase stats if available."""
     if not await _require_admin(update, context) or not update.message:
         return
     session = get_session(context.user_data)
@@ -2608,7 +2649,7 @@ async def handle_admin_status(update: Update, context: ContextTypes.DEFAULT_TYPE
     storage = _get_storage(context)
     settings = _get_settings(context)
     
-    # Count applications
+    # Count local applications
     app_count = 0
     if settings.applications_file.exists():
         with settings.applications_file.open("r", encoding="utf-8") as f:
@@ -2632,14 +2673,45 @@ async def handle_admin_status(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     
+    # Build local status message
+    local_status = ADMIN_STATUS[language].format(
+        app_count=app_count,
+        contact_count=contact_count,
+        session_count=session_count,
+        voice_count=voice_count,
+        timestamp=timestamp,
+    )
+    
+    # Try to get Supabase stats
+    supabase_client = _get_supabase_client(context)
+    supabase_status = ""
+    if supabase_client and supabase_client.supabase_enabled:
+        try:
+            remote_status = await supabase_client.get_bot_status()
+            if remote_status:
+                stats = remote_status.get("stats", {})
+                supabase_status = (
+                    "\n\n<b>📡 Supabase Stats</b>\n"
+                    if language == Language.EN else
+                    "\n\n<b>📡 آمار Supabase</b>\n"
+                )
+                supabase_status += (
+                    f"🌐 Status: {remote_status.get('status', 'unknown')}\n"
+                    f"👥 Total Applicants: {stats.get('total_applicants', 0)}\n"
+                    f"💬 Total Logs: {stats.get('total_logs', 0)}\n"
+                    f"❓ Questions: {stats.get('questions_count', 0)}\n"
+                    f"📄 Content Blocks: {stats.get('content_count', 0)}"
+                )
+        except Exception as exc:
+            logger.warning("Failed to fetch Supabase status: %s", exc)
+            supabase_status = (
+                "\n\n⚠️ Supabase: Connection failed"
+                if language == Language.EN else
+                "\n\n⚠️ Supabase: اتصال ناموفق"
+            )
+    
     await update.message.reply_text(
-        ADMIN_STATUS[language].format(
-            app_count=app_count,
-            contact_count=contact_count,
-            session_count=session_count,
-            voice_count=voice_count,
-            timestamp=timestamp,
-        ),
+        local_status + supabase_status,
         parse_mode="HTML",
     )
 
@@ -3298,6 +3370,20 @@ async def handle_admin_sessions(update: Update, context: ContextTypes.DEFAULT_TY
         )
 
 
+async def _refresh_config_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Periodically refresh remote configuration from Supabase."""
+    supabase_client = context.application.bot_data.get("supabase_client")
+    if supabase_client and supabase_client.enabled:
+        try:
+            success = await supabase_client.refresh_remote_content()
+            if success:
+                logger.info("Periodic config refresh completed successfully")
+            else:
+                logger.debug("Periodic config refresh returned no updates")
+        except Exception as exc:  # pylint: disable=broad-except
+            logger.warning("Periodic config refresh failed: %s", exc)
+
+
 def main() -> None:
     logging.basicConfig(
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -3310,6 +3396,7 @@ def main() -> None:
     if supabase_client.enabled:
         try:
             asyncio.run(supabase_client.refresh_remote_content())
+            logger.info("Initial remote config loaded from Supabase")
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("Failed to bootstrap remote config: %s", exc)
 
@@ -3333,6 +3420,16 @@ def main() -> None:
     )
     application.bot_data["supabase_client"] = supabase_client
     init_conversation_logger(supabase_client if supabase_client.enabled else None)
+
+    # Schedule periodic config refresh every 5 minutes if Supabase is enabled
+    if supabase_client.enabled:
+        application.job_queue.run_repeating(
+            _refresh_config_job,
+            interval=300,  # 5 minutes
+            first=300,  # First run after 5 minutes
+            name="config_refresh",
+        )
+        logger.info("Scheduled periodic config refresh every 5 minutes")
 
     # Log every incoming update (group -1 ensures it's first)
     application.add_handler(MessageHandler(filters.ALL, handle_conversation_logging), group=-1)
@@ -3370,6 +3467,16 @@ def main() -> None:
     logger.info(f"Total admin commands registered: 7 (admin, status, stats, debug, sessions, cleanup, testgroup)")
     if not settings.group_chat_id:
         logger.warning("⚠️ GROUP_CHAT_ID not set! Application notifications will not be sent to group.")
+    
+    # Log Supabase integration status
+    if supabase_client.supabase_enabled:
+        logger.info(f"✅ Supabase integration ENABLED")
+        logger.info(f"   - URL: {settings.supabase_url}")
+        logger.info(f"   - Applications endpoint: telegram-applications")
+        logger.info(f"   - Config refresh: every 5 minutes")
+    else:
+        logger.info("📴 Supabase integration not configured (local storage only)")
+    
     application.run_polling()
 
 
