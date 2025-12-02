@@ -40,6 +40,10 @@ class UserSession:
     last_menu_choice: Optional[str] = None
     ai_reply_count: int = 0
     ai_window_start: Optional[datetime] = None
+    remote_flow_key: Optional[str] = None
+    remote_flow_step: int = 0
+    remote_flow_answers: Dict[str, Optional[str]] = field(default_factory=dict)
+    remote_flow_waiting_question: Optional[str] = None
 
     def reset_hiring(self) -> None:
         self.flow = Flow.IDLE
@@ -61,6 +65,7 @@ class UserSession:
         self.resume_original_flow = None
         self.awaiting_view_roles = False
         self.last_menu_choice = None
+        self.clear_remote_flow()
 
     def start_hiring(self) -> None:
         self.flow = Flow.APPLY
@@ -82,6 +87,14 @@ class UserSession:
         self.resume_original_flow = None
         self.awaiting_view_roles = False
         self.last_menu_choice = "apply"
+        self.clear_remote_flow()
+
+    def clear_remote_flow(self) -> None:
+        """Reset any remote (builder-driven) flow state."""
+        self.remote_flow_key = None
+        self.remote_flow_step = 0
+        self.remote_flow_answers.clear()
+        self.remote_flow_waiting_question = None
 
     def mark_voice_wait(self) -> None:
         self.waiting_voice = True
@@ -122,6 +135,10 @@ class UserSession:
             "last_menu_choice": self.last_menu_choice,
             "ai_reply_count": self.ai_reply_count,
             "ai_window_start": self.ai_window_start.isoformat() if self.ai_window_start else None,
+            "remote_flow_key": self.remote_flow_key,
+            "remote_flow_step": self.remote_flow_step,
+            "remote_flow_answers": self.remote_flow_answers,
+            "remote_flow_waiting_question": self.remote_flow_waiting_question,
         }
 
     @classmethod
@@ -174,6 +191,11 @@ class UserSession:
                     session.ai_window_start = datetime.fromisoformat(data["ai_window_start"])
                 except (ValueError, TypeError):
                     session.ai_window_start = None
+            session.remote_flow_key = data.get("remote_flow_key")
+            session.remote_flow_step = data.get("remote_flow_step", 0)
+            remote_flow_answers = data.get("remote_flow_answers", {})
+            session.remote_flow_answers = remote_flow_answers if isinstance(remote_flow_answers, dict) else {}
+            session.remote_flow_waiting_question = data.get("remote_flow_waiting_question")
         except Exception:
             # If anything goes wrong, return a fresh session
             return cls()

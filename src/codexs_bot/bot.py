@@ -8,9 +8,10 @@ import re
 import time
 import uuid
 from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update
 from telegram.constants import ChatType
@@ -135,7 +136,6 @@ from .localization import (
     is_skip,
     language_keyboard,
     location_keyboard,
-    main_menu_labels,
     yes_no_keyboard,
     switch_language,
 )
@@ -144,6 +144,7 @@ from .storage import DataStorage
 from .notifications import WebhookNotifier
 from .supabase_client import SupabaseBotClient
 from .conversation_logger import init_conversation_logger, capture_incoming
+from .remote_config import default_menu_rows, remote_config
 
 
 logger = logging.getLogger(__name__)
@@ -336,6 +337,282 @@ def _keyboard_with_back(
     return ReplyKeyboardMarkup(rows, resize_keyboard=True, one_time_keyboard=one_time)
 
 
+async def _send_remote_content(
+    update: Update,
+    slug: Optional[str],
+    language: Language,
+    *,
+    reply_markup: Optional[ReplyKeyboardMarkup] = None,
+) -> bool:
+    """Helper to send a content block from Supabase if available."""
+    if not update.message or not slug:
+        return False
+    text = remote_config.get_content_text(slug, language)
+    if not text:
+        return False
+    await update.message.reply_text(text, parse_mode="HTML", reply_markup=reply_markup)
+    return True
+
+
+async def _start_application_flow(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+) -> None:
+    """Start the canonical hiring/application flow driven by Supabase."""
+    if not update.message:
+        return
+    language = session.language or Language.EN
+    session.start_hiring()
+    await _save_session(update, context, session)
+
+    flow = remote_config.get_flow("application_flow")
+    intro_sent = False
+    if flow:
+        for step in flow.get("steps", []):
+            if step.get("type") != "content":
+                break
+            slug = step.get("content_slug")
+            sent = await _send_remote_content(
+                update,
+                slug,
+                language,
+                reply_markup=ReplyKeyboardMarkup(back_keyboard(language), resize_keyboard=True),
+            )
+            intro_sent = intro_sent or sent
+    if not intro_sent:
+        intro_formatted = _format_hiring_intro(language)
+        await update.message.reply_text(
+            intro_formatted,
+            reply_markup=ReplyKeyboardMarkup(back_keyboard(language), resize_keyboard=True),
+            parse_mode="HTML",
+        )
+    await ask_current_question(update, session)
+
+
+async def _switch_language(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+) -> None:
+    if not update.message:
+        return
+    language = session.language or Language.EN
+    if session.has_incomplete_application() and update.effective_user:
+        await _save_session(update, context, session)
+    if session.flow == Flow.CONTACT_MESSAGE:
+        session.flow = Flow.IDLE
+        session.contact_pending = False
+        session.contact_message_draft = None
+        session.contact_review_pending = False
+    session.language = switch_language(language)
+    session.clear_remote_flow()
+    await _save_session(update, context, session)
+    await show_main_menu(update, session)
+
+
+async def _complete_remote_flow(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+    flow: Dict[str, Any],
+) -> None:
+    """Handle completion of a dashboard-defined flow (non-application)."""
+    if not update.message:
+        return
+    language = session.language or Language.EN
+    completion = flow.get("completion_action") or {}
+    completion_text = None
+    slug = completion.get("content_slug")
+    if slug:
+        completion_text = remote_config.get_content_text(slug, language)
+
+    action_type = completion.get("type")
+    if not completion_text and action_type == "store_exam_result":
+        completion_text = remote_config.get_content_text("exam_complete", language)
+
+    if not completion_text:
+        completion_text = (
+            "✅ Flow completed."
+            if language == Language.EN
+            else "✅ این جریان با موفقیت به پایان رسید."
+        )
+
+    await update.message.reply_text(
+        completion_text,
+        parse_mode="HTML",
+        reply_markup=_menu_keyboard(language),
+    )
+    session.clear_remote_flow()
+    await _save_session(update, context, session)
+
+
+async def _advance_remote_flow(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+) -> None:
+    """Advance through a dashboard-defined flow that isn't the hiring flow."""
+    if not update.message or not session.remote_flow_key:
+        return
+    flow = remote_config.get_flow(session.remote_flow_key)
+    if not flow:
+        await update.message.reply_text(
+            "⚠️ This flow is no longer available.",
+            parse_mode="HTML",
+            reply_markup=_menu_keyboard(session.language or Language.EN),
+        )
+        session.clear_remote_flow()
+        await _save_session(update, context, session)
+        return
+
+    steps = flow.get("steps", [])
+    language = session.language or Language.EN
+
+    while session.remote_flow_step < len(steps):
+        step = steps[session.remote_flow_step] or {}
+        step_type = step.get("type")
+
+        if step_type == "content":
+            slug = step.get("content_slug")
+            sent = await _send_remote_content(update, slug, language)
+            session.remote_flow_step += 1
+            if sent:
+                continue
+        elif step_type == "question":
+            question_key = step.get("question_key")
+            prompt = remote_config.get_question_prompt(question_key, language)
+            if prompt:
+                session.remote_flow_waiting_question = question_key
+                await update.message.reply_text(
+                    prompt,
+                    reply_markup=_keyboard_with_back(None, language),
+                    parse_mode="HTML",
+                )
+                await _save_session(update, context, session)
+                return
+            session.remote_flow_step += 1
+            continue
+        elif step_type == "exam":
+            exam_text = remote_config.get_content_text("exam_intro", language)
+            if exam_text:
+                await update.message.reply_text(exam_text, parse_mode="HTML")
+            placeholder = (
+                "🧠 Assessment module coming soon."
+                if language == Language.EN
+                else "🧠 ماژول ارزیابی به زودی فعال می‌شود."
+            )
+            await update.message.reply_text(placeholder, parse_mode="HTML")
+            session.remote_flow_step += 1
+            continue
+        else:
+            session.remote_flow_step += 1
+            continue
+
+    await _complete_remote_flow(update, context, session, flow)
+
+
+async def _start_remote_flow(
+    flow_key: str,
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+) -> None:
+    if not update.message:
+        return
+    session.clear_remote_flow()
+    flow = remote_config.get_flow(flow_key)
+    language = session.language or Language.EN
+    if not flow:
+        await update.message.reply_text(
+            "⚠️ This flow isn't configured yet."
+            if language == Language.EN
+            else "⚠️ این جریان هنوز پیکربندی نشده است.",
+            parse_mode="HTML",
+            reply_markup=_menu_keyboard(language),
+        )
+        return
+    session.remote_flow_key = flow_key
+    session.remote_flow_step = 0
+    session.remote_flow_answers = {}
+    session.remote_flow_waiting_question = None
+    await _save_session(update, context, session)
+    await _advance_remote_flow(update, context, session)
+
+
+async def _execute_remote_menu_action(
+    button: Dict[str, Any],
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+) -> bool:
+    """Execute a single Supabase-defined menu button action."""
+    if not update.message:
+        return False
+    language = session.language or Language.EN
+    action_type = (button.get("action_type") or "").lower()
+    config = button.get("action_config") or {}
+
+    if action_type == "start_flow":
+        flow_key = config.get("flow_key")
+        if flow_key == "application_flow":
+            await _start_application_flow(update, context, session)
+        else:
+            await _start_remote_flow(flow_key, update, context, session)
+        return True
+
+    if action_type == "send_content":
+        slug = config.get("content_slug")
+        content_text = remote_config.get_content_text(slug, language)
+        if content_text:
+            await update.message.reply_text(
+                content_text,
+                parse_mode="HTML",
+                reply_markup=_menu_keyboard(language),
+            )
+        else:
+            await update.message.reply_text(
+                "Content is not available yet."
+                if language == Language.EN
+                else "این محتوا هنوز در دسترس نیست.",
+                parse_mode="HTML",
+                reply_markup=_menu_keyboard(language),
+            )
+        return True
+
+    if action_type == "check_status":
+        await handle_user_status(update, context)
+        return True
+
+    if action_type == "toggle_language":
+        await _switch_language(update, context, session)
+        return True
+
+    return False
+
+
+async def _handle_remote_flow_message(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE,
+    session: UserSession,
+    text: str,
+) -> bool:
+    """Intercept user messages when a dashboard-defined flow is active."""
+    if not session.remote_flow_key or not update.message:
+        return False
+    language = session.language or Language.EN
+    if _is_menu_command(text, language) or _is_back_command(text, language) or is_back_button(text, language):
+        return False
+    if session.remote_flow_waiting_question:
+        session.remote_flow_answers[session.remote_flow_waiting_question] = text
+        session.remote_flow_waiting_question = None
+        session.remote_flow_step += 1
+        await _save_session(update, context, session)
+        await _advance_remote_flow(update, context, session)
+        return True
+    return False
+
+
 async def handle_conversation_logging(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Capture all inbound user messages for Supabase logging."""
     await capture_incoming(update)
@@ -346,6 +623,15 @@ def _language_keyboard() -> ReplyKeyboardMarkup:
         language_keyboard(),
         resize_keyboard=True,
         one_time_keyboard=True,
+    )
+
+
+def _menu_keyboard(language: Language, *, one_time: bool = False) -> ReplyKeyboardMarkup:
+    """Build the persistent main menu keyboard from remote config (with fallback)."""
+    return ReplyKeyboardMarkup(
+        default_menu_rows(language),
+        resize_keyboard=True,
+        one_time_keyboard=one_time,
     )
 
 
@@ -506,12 +792,17 @@ async def show_main_menu(update: Update, session: UserSession) -> None:
         return
     language = session.language or Language.EN
     session.last_menu_choice = None
+    remote_prompt = remote_config.get_content_text("menu_intro", language)
+    remote_helper = remote_config.get_content_text("menu_helper", language)
+    if remote_prompt and remote_helper:
+        message_text = f"{remote_prompt}\n{remote_helper}"
+    elif remote_prompt:
+        message_text = remote_prompt
+    else:
+        message_text = f"{MAIN_MENU_PROMPT[language]}\n{MENU_HELPER[language]}"
     await update.message.reply_text(
-        f"{MAIN_MENU_PROMPT[language]}\n{MENU_HELPER[language]}",
-        reply_markup=ReplyKeyboardMarkup(
-            main_menu_labels(language),
-            resize_keyboard=True,
-        ),
+        message_text,
+        reply_markup=_menu_keyboard(language),
     )
 
 
@@ -530,17 +821,16 @@ async def send_language_welcome(update: Update, context: ContextTypes.DEFAULT_TY
             break
     
     # Ensure keyboard is shown immediately after language selection
-    main_menu_keyboard = ReplyKeyboardMarkup(
-        main_menu_labels(language),
-        resize_keyboard=True,
-    )
+    main_menu_keyboard = _menu_keyboard(language)
+
+    welcome_text = remote_config.get_content_text("welcome", language) or WELCOME_MESSAGE[language]
     
     if welcome_banner_path and settings.enable_media:
         try:
             with open(welcome_banner_path, "rb") as banner_file:
                 await update.message.reply_photo(
                     photo=banner_file,
-                    caption=WELCOME_MESSAGE[language],
+                    caption=welcome_text,
                     parse_mode="HTML",
                     reply_markup=main_menu_keyboard,
                 )
@@ -548,13 +838,13 @@ async def send_language_welcome(update: Update, context: ContextTypes.DEFAULT_TY
             logger.warning(f"Failed to send welcome banner: {exc}")
             # Fallback to text only with keyboard
             await update.message.reply_text(
-                WELCOME_MESSAGE[language],
+                welcome_text,
                 parse_mode="HTML",
                 reply_markup=main_menu_keyboard,
             )
     else:
         await update.message.reply_text(
-            WELCOME_MESSAGE[language],
+            welcome_text,
             parse_mode="HTML",
             reply_markup=main_menu_keyboard,
         )
@@ -797,7 +1087,7 @@ async def _maybe_ai_reply(
         await update.message.reply_text(
             AI_RATE_LIMIT_MESSAGE[language],
             parse_mode="HTML",
-            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            reply_markup=_menu_keyboard(language),
         )
         return True
 
@@ -810,7 +1100,7 @@ async def _maybe_ai_reply(
         await update.message.reply_text(
             ai_reply,
             parse_mode="HTML",
-            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            reply_markup=_menu_keyboard(language),
         )
         session.ai_reply_count += 1
         return True
@@ -901,7 +1191,7 @@ async def handle_exit_confirmation(update: Update, session: UserSession, text: s
         session.awaiting_view_roles = False
         await update.message.reply_text(
             EXIT_CONFIRM_DONE[language],
-            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            reply_markup=_menu_keyboard(language),
         )
         return
     if is_no(text, language):
@@ -1002,6 +1292,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     language = session.language
+
+    if await _handle_remote_flow_message(update, context, session, text):
+        return
 
     # Handle resume response (check if we have incomplete application and flow is IDLE - resume prompt state)
     if session.flow == Flow.IDLE and session.has_incomplete_application() and session.resume_original_flow:
@@ -1311,7 +1604,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
                 session.contact_review_pending = False
                 await update.message.reply_text(
                     CONTACT_SKIP[language],
-                    reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+                    reply_markup=_menu_keyboard(language),
                 )
                 await _save_session(update, context, session)
                 return
@@ -1370,23 +1663,18 @@ async def handle_main_menu_choice(
     session.contact_pending = False
     session.flow = Flow.IDLE
     session.last_menu_choice = None
+    remote_button = remote_config.find_menu_button(text, language)
+    if remote_button:
+        handled = await _execute_remote_menu_action(remote_button, update, context, session)
+        if handled:
+            return
+
     matched_key = _match_menu_button(text, language)
     if matched_key in {"apply", "about", "updates", "contact", "history"}:
         await _open_menu_section(matched_key, update, context, session, language)
         return
     if matched_key == "switch":
-        # Save session before language switch to preserve any incomplete work
-        if session.has_incomplete_application() and update.effective_user:
-            await _save_session(update, context, session)
-        # Clear contact flow state when switching language
-        if session.flow == Flow.CONTACT_MESSAGE:
-            session.flow = Flow.IDLE
-            session.contact_pending = False
-            session.contact_message_draft = None
-            session.contact_review_pending = False
-        session.language = switch_language(language)
-        await _save_session(update, context, session)  # Save new language preference
-        await show_main_menu(update, session)
+        await _switch_language(update, context, session)
         return
 
     inferred_key = _infer_menu_choice(text, language)
@@ -1401,10 +1689,10 @@ async def handle_main_menu_choice(
 
     if not await _maybe_ai_reply(update, context, session, text):
         await update.message.reply_text(
-        FALLBACK_MESSAGE[language],
-        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            FALLBACK_MESSAGE[language],
+            reply_markup=_menu_keyboard(language),
             parse_mode="HTML",
-    )
+        )
 
 
 async def share_about_story(update: Update, context: ContextTypes.DEFAULT_TYPE, session: UserSession, language: Language) -> None:
@@ -1478,7 +1766,7 @@ async def share_updates(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         if news:
             await update.message.reply_text(
                 f"{news}\n\nMore: {UPDATES_LINK}",
-                reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+                reply_markup=_menu_keyboard(language),
             )
             displayed_content = True
 
@@ -1492,13 +1780,13 @@ async def share_updates(update: Update, context: ContextTypes.DEFAULT_TYPE, lang
         )
         await update.message.reply_text(
             no_updates_msg.format(link=UPDATES_LINK),
-            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            reply_markup=_menu_keyboard(language),
         )
         return
 
     await update.message.reply_text(
         f"{UPDATES_CTA[language]} {UPDATES_LINK}",
-        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        reply_markup=_menu_keyboard(language),
     )
 
 
@@ -1518,7 +1806,7 @@ async def show_application_history(
     if not applications:
         await update.message.reply_text(
             APPLICATION_HISTORY_EMPTY[language],
-            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            reply_markup=_menu_keyboard(language),
             parse_mode="HTML",
         )
         return
@@ -1526,7 +1814,7 @@ async def show_application_history(
     # Send header
     await update.message.reply_text(
         APPLICATION_HISTORY_HEADER[language],
-        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        reply_markup=_menu_keyboard(language),
         parse_mode="HTML",
     )
     
@@ -1792,7 +2080,7 @@ async def handle_application_answer(
         logger.error(f"Invalid question key '{question.key}' - this should never happen!")
         await update.message.reply_text(
             ERROR_GENERIC[language],
-            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            reply_markup=_menu_keyboard(language),
         )
         return
     
@@ -1831,14 +2119,14 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if not session.waiting_voice or session.language is None or session.flow != Flow.APPLY:
         await update.message.reply_text(
             ERROR_GENERIC[language],
-            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            reply_markup=_menu_keyboard(language),
         )
         return
 
     if not update.effective_user:
         await update.message.reply_text(
             ERROR_GENERIC[language],
-            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            reply_markup=_menu_keyboard(language),
         )
         return
 
@@ -1991,7 +2279,7 @@ async def finalize_application(update: Update, context: ContextTypes.DEFAULT_TYP
         await update.message.reply_text(
             ERROR_APPLICATION_SAVE_FAILED[language].format(app_id=application_id),
             parse_mode="HTML",
-            reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+            reply_markup=_menu_keyboard(language),
         )
         # Don't clear session - user can try again
         return
@@ -2083,9 +2371,14 @@ async def finalize_application(update: Update, context: ContextTypes.DEFAULT_TYP
         await storage.delete_session(update.effective_user.id)
     
     # Send thank you message with application ID
+    success_text = remote_config.get_content_text("application_success", language)
+    if success_text:
+        success_text = success_text.replace("{app_id}", application_id)
+    else:
+        success_text = THANK_YOU[language].format(app_id=application_id)
     await update.message.reply_text(
-        THANK_YOU[language].format(app_id=application_id),
-        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        success_text,
+        reply_markup=_menu_keyboard(language),
         parse_mode="HTML",
     )
     
@@ -2168,7 +2461,7 @@ async def save_contact_message(
     session.contact_pending = False
     await update.message.reply_text(
         CONTACT_THANKS[language],
-        reply_markup=ReplyKeyboardMarkup(main_menu_labels(language), resize_keyboard=True),
+        reply_markup=_menu_keyboard(language),
     )
     await _save_session(update, context, session)
 
@@ -2587,22 +2880,34 @@ async def handle_user_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
     language = session.language or Language.EN
 
     if not supabase_client or not supabase_client.enabled:
+        disabled_text = remote_config.get_content_text("status_disabled", language)
+        if not disabled_text:
+            disabled_text = (
+                "📡 Status tracking isn't enabled yet. Please try again later."
+                if language == Language.EN
+                else "📡 پیگیری وضعیت هنوز فعال نشده است. لطفاً بعداً دوباره امتحان کنید."
+            )
         await update.message.reply_text(
-            "📡 Status tracking isn't enabled yet. Please try again later."
-            if language == Language.EN
-            else "📡 پیگیری وضعیت هنوز فعال نشده است. لطفاً بعداً دوباره امتحان کنید.",
+            disabled_text,
             parse_mode="HTML",
+            reply_markup=_menu_keyboard(language),
         )
         return
 
     status_payload = await supabase_client.fetch_applicant_status(update.effective_user.id)
     if not status_payload or status_payload.get("status") in {None, "unknown"}:
+        missing_text = remote_config.get_content_text("status_no_application", language)
+        if not missing_text:
+            missing_text = (
+                "I couldn't find an application linked to this Telegram account. "
+                "Submit a new application from the main menu."
+                if language == Language.EN
+                else "درخواستی مرتبط با این حساب تلگرام پیدا نشد. از منوی اصلی می‌توانید درخواست جدید ارسال کنید."
+            )
         await update.message.reply_text(
-            "I couldn't find an application linked to this Telegram account. "
-            "Submit a new application from the main menu."
-            if language == Language.EN
-            else "درخواستی مرتبط با این حساب تلگرام پیدا نشد. از منوی اصلی می‌توانید درخواست جدید ارسال کنید.",
+            missing_text,
             parse_mode="HTML",
+            reply_markup=_menu_keyboard(language),
         )
         return
 
@@ -2612,6 +2917,22 @@ async def handle_user_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
     submitted_at = status_payload.get("submitted_at")
     earliest_start = status_payload.get("earliest_start")
     working_hours = status_payload.get("working_hours")
+    case_number = status_payload.get("case_number", "N/A")
+
+    slug = f"status_{stage_key}".lower()
+    status_text = remote_config.get_content_text(slug, language)
+    if status_text:
+        status_text = (
+            status_text.replace("{case_number}", str(case_number or "N/A"))
+            .replace("{submitted_date}", submitted_at or "N/A")
+            .replace("{stage_label}", stage_label)
+        )
+        await update.message.reply_text(
+            status_text,
+            parse_mode="HTML",
+            reply_markup=_menu_keyboard(language),
+        )
+        return
 
     lines = [
         "📊 <b>Application Status</b>" if language == Language.EN else "📊 <b>وضعیت درخواست</b>",
@@ -2637,7 +2958,7 @@ async def handle_user_status(update: Update, context: ContextTypes.DEFAULT_TYPE)
         else "به محض آماده شدن مرحله بعدی از طریق تلگرام با شما تماس می‌گیریم."
     )
 
-    await update.message.reply_text("\n".join(lines), parse_mode="HTML")
+    await update.message.reply_text("\n".join(lines), parse_mode="HTML", reply_markup=_menu_keyboard(language))
 
 
 async def handle_admin_status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

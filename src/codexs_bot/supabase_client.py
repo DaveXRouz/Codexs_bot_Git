@@ -11,6 +11,7 @@ from .localization import (
     apply_remote_content_blocks,
     apply_remote_questions,
 )
+from .remote_config import remote_config
 
 logger = logging.getLogger(__name__)
 
@@ -58,28 +59,38 @@ class SupabaseBotClient:
             headers["x-bot-key"] = self._api_key
         return headers
 
-    async def refresh_remote_content(self) -> bool:
-        """Fetch latest question/content config and apply overrides."""
+    async def fetch_bot_config(self) -> Optional[Dict[str, Any]]:
+        """Fetch the complete bot configuration payload from Supabase."""
         if not self._config_url or not self.enabled:
-            return False
-
+            return None
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.get(self._config_url, headers=self._headers())
                 response.raise_for_status()
-                payload = response.json()
+                return response.json()
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning("Failed to fetch remote bot config: %s", exc)
+            return None
+
+    async def refresh_remote_content(self) -> bool:
+        """Fetch latest Supabase config and update localization/menus."""
+        payload = await self.fetch_bot_config()
+        if not payload:
             return False
+
+        remote_config.update_from_payload(payload)
 
         questions = payload.get("questions")
         content = payload.get("content")
         if questions:
             apply_remote_questions(questions)
-            logger.info(f"Applied {len(questions)} remote questions from Supabase")
+            logger.info("Applied %d remote questions from Supabase", len(questions))
         if content:
             apply_remote_content_blocks(content)
-            logger.info(f"Applied {len(content)} remote content blocks from Supabase")
+            logger.info(
+                "Applied %d remote content blocks from Supabase",
+                len(content) if isinstance(content, (list, tuple)) else len(content.keys()),
+            )
         return True
 
     async def fetch_applicant_status(self, telegram_user_id: int) -> Optional[Dict[str, Any]]:
