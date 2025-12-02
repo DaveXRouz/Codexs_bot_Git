@@ -52,10 +52,10 @@ class SupabaseBotClient:
         return headers
 
     def _application_headers(self) -> Dict[str, str]:
-        """Headers for application submission (uses webhook secret)."""
+        """Headers for application submission (standardized to x-bot-key)."""
         headers = {"Content-Type": "application/json"}
-        if self._webhook_secret:
-            headers["x-bot-secret"] = self._webhook_secret
+        if self._api_key:
+            headers["x-bot-key"] = self._api_key
         return headers
 
     async def refresh_remote_content(self) -> bool:
