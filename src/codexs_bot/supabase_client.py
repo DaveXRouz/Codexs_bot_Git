@@ -13,6 +13,10 @@ from .localization import (
 )
 from .remote_config import remote_config
 
+SUPABASE_ANON_KEY = (
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVtYmN6b2x2anFuYmFxZXdsc2xjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM3MzkxNTcsImV4cCI6MjA3OTMxNTE1N30.5LIjzPpSR-scoYhzrfqF_6ab4l165U0dlUOjEa3W5J4"
+)
+
 logger = logging.getLogger(__name__)
 
 # Constants for retry logic
@@ -65,7 +69,12 @@ class SupabaseBotClient:
             return None
         try:
             async with httpx.AsyncClient(timeout=10) as client:
-                response = await client.get(self._config_url, headers=self._headers())
+                headers = {
+                    "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
+                    "x-bot-key": self._api_key or "",
+                    "Content-Type": "application/json",
+                }
+                response = await client.get(self._config_url, headers=headers)
                 response.raise_for_status()
                 return response.json()
         except Exception as exc:  # pylint: disable=broad-except
