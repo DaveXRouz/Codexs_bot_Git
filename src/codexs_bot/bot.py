@@ -8,7 +8,6 @@ import re
 import time
 import uuid
 from collections import defaultdict
-from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -51,7 +50,6 @@ from .localization import (
     CONTACT_SEND_BUTTON,
     CONTACT_SKIP,
     CONTACT_THANKS,
-    CONTACT_DECISION_REMINDER,
     CONFIRM_PROMPT,
     CONFIRMATION_IMAGE_CAPTION,
     EDIT_PROMPT,
